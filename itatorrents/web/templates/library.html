@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ label }} — ItaTorrents{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">
+    {% if category == 'movies' %}🎬{% elif category == 'series' %}📺{% else %}🎌{% endif %}
+    {{ label }}
+  </h1>
+  <span class="badge">{{ items | length }} elementi</span>
+</div>
+
+{% if items %}
+<div class="grid">
+  {% for item in items %}
+  <a href="/library/{{ category }}/{{ item.name }}" class="card">
+    <div class="card-thumb">
+      <span class="card-thumb-icon">
+        {% if item.kind == 'series' %}📺{% elif category == 'anime' %}🎌{% else %}🎬{% endif %}
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="card-title">{{ item.title }}</div>
+      {% if item.year %}
+      <div class="card-meta">{{ item.year }}</div>
+      {% endif %}
+      <div class="card-tags">
+        <span class="tag tag-{{ item.kind }}">{{ item.kind }}</span>
+        {% if item.kind == 'series' %}
+        <span class="tag tag-muted">{{ item.seasons | length }} stagioni</span>
+        {% else %}
+        <span class="tag tag-muted">{{ item.total_files }} file</span>
+        {% endif %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">📂</div>
+  <p>Nessun contenuto trovato in <code>~/media/{{ category }}/</code></p>
+</div>
+{% endif %}
+{% endblock %}

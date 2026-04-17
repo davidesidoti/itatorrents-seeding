@@ -1,0 +1,79 @@
+<!-- Step 5: Launch unit3dup with live log -->
+<div id="stepper" hx-swap-oob="true" class="stepper">
+  <div class="step done"><span class="step-num">1</span><span class="step-label">Audio</span></div>
+  <div class="step-line"></div>
+  <div class="step done"><span class="step-num">2</span><span class="step-label">TMDB</span></div>
+  <div class="step-line"></div>
+  <div class="step done"><span class="step-num">3</span><span class="step-label">Nomi</span></div>
+  <div class="step-line"></div>
+  <div class="step done"><span class="step-num">4</span><span class="step-label">Hardlink</span></div>
+  <div class="step-line"></div>
+  <div class="step active"><span class="step-num">5</span><span class="step-label">Upload</span></div>
+</div>
+
+{% if errors %}
+<div class="alert alert-error">
+  {% for e in errors %}
+  <div>❌ {{ e }}</div>
+  {% endfor %}
+</div>
+{% else %}
+<h2 class="wizard-title">Upload su ItaTorrents</h2>
+<p class="wizard-subtitle">
+  Hardlink creato in <code class="mono">{{ seeding_path }}</code>
+</p>
+
+<div class="info-box">
+  <strong>Pronto per l'upload.</strong> Clicca per avviare <code>unit3dup</code>.
+</div>
+
+<button id="upload-btn" class="btn btn-primary mt-4" onclick="startUpload()">
+  🚀 Avvia Upload
+</button>
+
+<div id="upload-log" class="log-box" style="display:none"></div>
+<div id="upload-result"></div>
+
+<script>
+function startUpload() {
+  const token = {{ token | tojson }};
+  document.getElementById('upload-btn').disabled = true;
+  document.getElementById('upload-btn').textContent = '⏳ Uploading...';
+  const logBox = document.getElementById('upload-log');
+  logBox.style.display = 'block';
+
+  const src = new EventSource('/wizard/' + token + '/stream/upload');
+
+  src.addEventListener('log', function(e) {
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.textContent = e.data;
+    logBox.appendChild(line);
+    logBox.scrollTop = logBox.scrollHeight;
+  });
+
+  src.addEventListener('done', function(e) {
+    src.close();
+    const d = JSON.parse(e.data);
+    const res = document.getElementById('upload-result');
+    if (d.exit_code === 0) {
+      res.innerHTML = '<div class="alert alert-ok">✅ Upload completato con successo!</div>' +
+        '<a href="/uploaded" class="btn btn-secondary mt-2">Vai a Caricati</a>';
+    } else {
+      res.innerHTML = '<div class="alert alert-error">❌ unit3dup ha restituito exit code ' + d.exit_code + '</div>';
+    }
+    document.getElementById('upload-btn').style.display = 'none';
+  });
+
+  src.addEventListener('error', function(e) {
+    src.close();
+    document.getElementById('upload-result').innerHTML =
+      '<div class="alert alert-error">❌ ' + (e.data || 'Errore SSE') + '</div>';
+  });
+
+  src.onerror = function() {
+    src.close();
+  };
+}
+</script>
+{% endif %}

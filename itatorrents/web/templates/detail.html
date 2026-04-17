@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} — ItaTorrents{% endblock %}
+{% block content %}
+<div class="breadcrumb">
+  <a href="/library/{{ category }}">{{ label }}</a>
+  <span class="breadcrumb-sep">›</span>
+  <span>{{ item.title }}</span>
+</div>
+
+<div class="detail-header">
+  <div class="detail-thumb">
+    {% if item.kind == 'series' %}📺{% elif category == 'anime' %}🎌{% else %}🎬{% endif %}
+  </div>
+  <div class="detail-info">
+    <h1 class="detail-title">{{ item.title }}</h1>
+    <div class="detail-meta">
+      {% if item.year %}<span class="badge">{{ item.year }}</span>{% endif %}
+      <span class="tag tag-{{ item.kind }}">{{ item.kind }}</span>
+      <span class="tag tag-muted">{{ item.path }}</span>
+    </div>
+  </div>
+</div>
+
+{% if item.kind == 'series' %}
+  <h2 class="section-title">Stagioni</h2>
+  {% if item.seasons %}
+  <div class="seasons-list">
+    {% for season in item.seasons %}
+    <div class="season-card">
+      <div class="season-header">
+        <span class="season-label">{{ season.label }}</span>
+        <span class="season-count">{{ season.episode_count }} episodi</span>
+      </div>
+      <div class="season-files">
+        {% for f in season.video_files[:5] %}
+        <div class="file-row">
+          <span class="file-icon">🎞</span>
+          <span class="file-name">{{ f.name }}</span>
+        </div>
+        {% endfor %}
+        {% if season.video_files | length > 5 %}
+        <div class="file-row muted">+ {{ season.video_files | length - 5 }} altri...</div>
+        {% endif %}
+      </div>
+      <form action="/wizard/start" method="post" class="mt-2">
+        <input type="hidden" name="path" value="{{ season.path }}">
+        <input type="hidden" name="category" value="{{ category }}">
+        <input type="hidden" name="kind" value="series">
+        <button type="submit" class="btn btn-primary">
+          ⬆ Carica su ItaTorrents
+        </button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">Nessuna stagione trovata (nessuna cartella "Season XX" in {{ item.path }}).</p>
+  {% endif %}
+
+{% else %}
+  <h2 class="section-title">File video</h2>
+  <div class="files-list">
+    {% for f in item.video_files %}
+    <div class="file-row">
+      <span class="file-icon">🎞</span>
+      <span class="file-name">{{ f.name }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <form action="/wizard/start" method="post" class="mt-4">
+    <input type="hidden" name="path" value="{{ item.path }}">
+    <input type="hidden" name="category" value="{{ category }}">
+    <input type="hidden" name="kind" value="movie">
+    <button type="submit" class="btn btn-primary btn-lg">
+      ⬆ Carica su ItaTorrents
+    </button>
+  </form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,64 @@
+"""FastAPI application factory."""
+import os
+from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+
+from .auth import SECRET_KEY, is_authenticated
+from .db import init_db
+from .routes import auth as auth_router
+from .routes import library as library_router
+from .routes import uploaded as uploaded_router
+from .routes import wizard as wizard_router
+
+STATIC_DIR = Path(__file__).parent / "static"
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+
+app = FastAPI(title="ItaTorrents Web", docs_url=None, redoc_url=None)
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    https_only=os.environ.get("ITA_HTTPS_ONLY", "0") == "1",
+    same_site="lax",
+    max_age=86400 * 7,
+)
+
+
+@app.middleware("http")
+async def auth_guard(request: Request, call_next):
+    public = {"/login", "/static"}
+    path = request.url.path
+    if path.startswith("/static") or path == "/login":
+        return await call_next(request)
+    if not is_authenticated(request):
+        return RedirectResponse(f"/login?next={path}", status_code=303)
+    return await call_next(request)
+
+
+@app.on_event("startup")
+async def startup():
+    await init_db()
+
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+app.include_router(auth_router.router)
+app.include_router(library_router.router)
+app.include_router(wizard_router.router)
+app.include_router(uploaded_router.router)
+
+
+def run():
+    import uvicorn
+    host = os.environ.get("ITA_HOST", "127.0.0.1")
+    port = int(os.environ.get("ITA_PORT", "8765"))
+    uvicorn.run("itatorrents.web.app:app", host=host, port=port, reload=False)
+
+
+if __name__ == "__main__":
+    run()

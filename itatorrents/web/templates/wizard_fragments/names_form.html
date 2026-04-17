@@ -1,0 +1,58 @@
+<!-- Step 3: Review / edit proposed names. Returned by POST /wizard/{token}/tmdb -->
+<div id="stepper" hx-swap-oob="true" class="stepper">
+  <div class="step done"><span class="step-num">1</span><span class="step-label">Audio</span></div>
+  <div class="step-line"></div>
+  <div class="step done"><span class="step-num">2</span><span class="step-label">TMDB</span></div>
+  <div class="step-line"></div>
+  <div class="step active"><span class="step-num">3</span><span class="step-label">Nomi</span></div>
+  <div class="step-line"></div>
+  <div class="step"><span class="step-num">4</span><span class="step-label">Hardlink</span></div>
+  <div class="step-line"></div>
+  <div class="step"><span class="step-num">5</span><span class="step-label">Upload</span></div>
+</div>
+
+{% if state.tmdb_data %}
+<div class="tmdb-preview">
+  {% if state.tmdb_data.poster %}
+  <img src="{{ state.tmdb_data.poster }}" alt="poster" class="tmdb-poster">
+  {% endif %}
+  <div class="tmdb-info">
+    <div class="tmdb-title">{{ state.tmdb_data.title }}</div>
+    {% if state.tmdb_data.year %}<div class="tmdb-year">{{ state.tmdb_data.year }}</div>{% endif %}
+    {% if state.tmdb_data.overview %}<p class="tmdb-overview">{{ state.tmdb_data.overview }}</p>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<h2 class="wizard-title">Conferma Nomi File</h2>
+<p class="wizard-subtitle">Modifica i nomi proposti se necessario.</p>
+
+<form
+  hx-post="/wizard/{{ token }}/names"
+  hx-target="#wizard-content"
+  hx-swap="innerHTML"
+>
+  {% if state.kind == 'series' and state.folder_name %}
+  <div class="form-group">
+    <label>Nome cartella</label>
+    <input type="text" name="folder_name" value="{{ state.folder_name }}" class="mono">
+  </div>
+  {% endif %}
+
+  <div class="names-list">
+    {% for file_path, proposed_name in proposed.items() %}
+    <div class="name-row">
+      <div class="name-orig mono muted">{{ file_path.split('/')[-1] }}</div>
+      <div class="name-arrow">→</div>
+      <input
+        type="text"
+        name="name_{{ file_path }}"
+        value="{{ proposed_name }}"
+        class="name-input mono"
+      >
+    </div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-primary mt-4">Conferma e crea hardlink</button>
+</form>
