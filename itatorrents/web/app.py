@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from .auth import SECRET_KEY, is_authenticated
@@ -16,28 +16,29 @@ from .routes import uploaded as uploaded_router
 from .routes import wizard as wizard_router
 
 STATIC_DIR = Path(__file__).parent / "static"
-TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 app = FastAPI(title="ItaTorrents Web", docs_url=None, redoc_url=None)
 
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=SECRET_KEY,
-    https_only=os.environ.get("ITA_HTTPS_ONLY", "0") == "1",
-    same_site="lax",
-    max_age=86400 * 7,
-)
 
-
-@app.middleware("http")
-async def auth_guard(request: Request, call_next):
-    public = {"/login", "/static"}
+async def _auth_guard(request: Request, call_next):
     path = request.url.path
     if path.startswith("/static") or path == "/login":
         return await call_next(request)
     if not is_authenticated(request):
         return RedirectResponse(f"/login?next={path}", status_code=303)
     return await call_next(request)
+
+
+# Middleware order: LAST add_middleware = OUTERMOST = runs first.
+# SessionMiddleware must be outermost so session is populated before auth_guard.
+app.add_middleware(BaseHTTPMiddleware, dispatch=_auth_guard)  # inner (runs second)
+app.add_middleware(                                            # outer (runs first)
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    https_only=os.environ.get("ITA_HTTPS_ONLY", "0") == "1",
+    same_site="lax",
+    max_age=86400 * 7,
+)
 
 
 @app.on_event("startup")
