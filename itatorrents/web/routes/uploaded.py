@@ -38,13 +38,22 @@ async def uploaded_page(request: Request):
             "in_db": record is not None,
         })
 
+    # Manual marks: DB records with seeding_path starting with __manual__
+    manual = [
+        r for r in db_records
+        if r["seeding_path"].startswith("__manual__:")
+    ]
+
+    # Orphaned: in DB, not on disk, not manual
     orphaned = [
         r for r in db_records
         if r["seeding_path"] not in seeding_paths_on_fs
+        and not r["seeding_path"].startswith("__manual__:")
     ]
 
     return templates.TemplateResponse(request, "uploaded.html", {
         "items": items,
+        "manual": manual,
         "orphaned": orphaned,
         "active": "uploaded",
     })
@@ -53,6 +62,11 @@ async def uploaded_page(request: Request):
 @router.post("/uploaded/delete")
 async def uploaded_delete(seeding_path: str = Form(...), delete_file: str = Form("1")):
     """Remove DB record and optionally the file/folder from ~/seedings/."""
+    # Manual marks: never touch filesystem
+    if seeding_path.startswith("__manual__:"):
+        await delete_record(seeding_path)
+        return JSONResponse({"ok": True})
+
     # Safety: only allow deletion inside ~/seedings/
     seedings_root = (Path.home() / "seedings").resolve()
     target = Path(seeding_path).resolve()
@@ -69,7 +83,5 @@ async def uploaded_delete(seeding_path: str = Form(...), delete_file: str = Form
         except OSError as e:
             return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
-    # Remove from DB (use original seeding_path string as stored)
     await delete_record(seeding_path)
-
     return JSONResponse({"ok": True})

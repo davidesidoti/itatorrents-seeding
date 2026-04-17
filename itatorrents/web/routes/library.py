@@ -4,14 +4,14 @@ import json
 import os
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sse_starlette.sse import EventSourceResponse
 
 from ...core import tmdb_fetch, tmdb_poster_url, tmdb_search, tmdb_year
 from ...media import CATEGORIES, get_item, scan_category
-from ..db import list_uploads
-from ..tmdb_cache import get_many, set_cache
+from ..db import list_uploads, record_upload
+from ..tmdb_cache import get_cache, get_many, set_cache
 from ..templates_env import ROOT_PATH, templates
 
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
@@ -193,6 +193,53 @@ async def library_enrich(request: Request, category: str):
         yield {"event": "done", "data": "{}"}
 
     return EventSourceResponse(generate())
+
+
+@router.post("/library/{category}/{item_name:path}/mark-uploaded")
+async def library_mark_uploaded(
+    request: Request,
+    category: str,
+    item_name: str,
+    season_path: str = Form(""),
+):
+    """Create a manual DB record so this item is filtered from the library."""
+    if category not in CATEGORIES:
+        raise HTTPException(404, "Categoria non trovata")
+    item = get_item(category, item_name)
+    if item is None:
+        raise HTTPException(404, f"'{item_name}' non trovato in {category}")
+
+    from pathlib import Path as _Path
+
+    # source_path: season-level for series, item-level for movies
+    if season_path:
+        source_path = str(_Path(season_path).resolve())
+        kind = "series"
+    else:
+        source_path = str(item.path.resolve())
+        kind = item.kind
+
+    seeding_path = f"__manual__:{source_path}"
+
+    # Pull title/year/tmdb_id from cache if available
+    cache_entry = await get_cache(str(item.path)) or await get_cache(source_path)
+    title = (cache_entry.get("title") or item.title) if cache_entry else item.title
+    year = (cache_entry.get("year") or item.year) if cache_entry else item.year
+    tmdb_id = cache_entry.get("tmdb_id", "") if cache_entry else ""
+
+    await record_upload(
+        category=category,
+        kind=kind,
+        source_path=source_path,
+        seeding_path=seeding_path,
+        tmdb_id=tmdb_id,
+        title=title,
+        year=year,
+        final_name="",
+        exit_code=0,
+    )
+
+    return RedirectResponse(f"{ROOT_PATH}/library/{category}/{item_name}", status_code=303)
 
 
 @router.get("/library/{category}/{item_name:path}", response_class=HTMLResponse)

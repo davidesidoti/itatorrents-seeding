@@ -581,6 +581,10 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 .tmdb-result-overview { font-size: 11px; line-height: 1.4;
   overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
+/* ── Detail page action rows ── */
+.season-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.movie-actions  { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
 /* ── Delete button (uploaded table) ── */
 .btn-delete {
   background: none;

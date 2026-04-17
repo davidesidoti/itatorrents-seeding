@@ -67,6 +67,33 @@
 </div>
 {% endif %}
 
+{% if manual %}
+<div class="section-title mt-4">✓ Marcati manualmente come caricati</div>
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Sorgente</th><th>Tipo</th><th>Titolo</th><th>Anno</th><th></th></tr></thead>
+    <tbody>
+      {% for r in manual %}
+      {% set row_id = "manual-" ~ loop.index %}
+      <tr id="{{ row_id }}">
+        <td class="mono">{{ r.seeding_path.replace('__manual__:', '') }}</td>
+        <td><span class="tag tag-{{ r.kind or 'movie' }}">{{ r.kind or '—' }}</span></td>
+        <td>{{ r.title or '—' }}</td>
+        <td>{{ r.year or '—' }}</td>
+        <td>
+          <button class="btn-delete"
+                  data-path="{{ r.seeding_path | e }}"
+                  data-row="{{ row_id }}"
+                  data-delete-file="0"
+                  title="Rimuovi contrassegno">✕</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
 {% if orphaned %}
 <div class="section-title mt-4">⚠ Record senza file (rimossi da ~/seedings/)</div>
 <div class="table-wrap">
