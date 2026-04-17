@@ -416,6 +416,44 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 }
 .log-line { color: #a0aec0; padding: 1px 0; }
 
+/* ── Stdin prompt (unit3dup interactive input) ── */
+.stdin-prompt-box {
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.35);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+.stdin-prompt-label {
+  font-family: monospace;
+  font-size: 13px;
+  color: #fbbf24;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+.stdin-prompt-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.stdin-input {
+  flex: 1;
+  background: #0a0b11;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: monospace;
+}
+.stdin-input:focus { outline: none; border-color: var(--accent); }
+.stdin-prompt-hint {
+  font-size: 11px;
+  color: var(--text-muted, #6b7280);
+  margin-top: 6px;
+}
+.btn-sm { padding: 6px 14px; font-size: 13px; }
+
 /* ── Table ── */
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
 .table {

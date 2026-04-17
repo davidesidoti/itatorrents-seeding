@@ -32,47 +32,94 @@
 </button>
 
 <div id="upload-log" class="log-box" style="display:none"></div>
+
+<div id="stdin-input-area" style="display:none" class="stdin-prompt-box">
+  <div id="stdin-prompt-text" class="stdin-prompt-label"></div>
+  <div class="stdin-prompt-row">
+    <input id="stdin-value" type="text" class="stdin-input" placeholder="0 = skip">
+    <button onclick="submitStdin()" class="btn btn-primary btn-sm">Invia</button>
+  </div>
+  <div class="stdin-prompt-hint">Inserisci ID numerico oppure 0 per saltare.</div>
+</div>
+
 <div id="upload-result"></div>
 
 <script>
-function startUpload() {
+(function() {
   const token = {{ token | tojson }};
   const rootPath = {{ root_path | tojson }};
-  document.getElementById('upload-btn').disabled = true;
-  document.getElementById('upload-btn').textContent = '⏳ Uploading...';
-  const logBox = document.getElementById('upload-log');
-  logBox.style.display = 'block';
+  var _src = null;
 
-  const src = new EventSource(rootPath + '/wizard/' + token + '/stream/upload');
+  window.startUpload = function() {
+    document.getElementById('upload-btn').disabled = true;
+    document.getElementById('upload-btn').textContent = '⏳ Uploading...';
+    const logBox = document.getElementById('upload-log');
+    logBox.style.display = 'block';
 
-  src.addEventListener('log', function(e) {
-    const line = document.createElement('div');
-    line.className = 'log-line';
-    line.textContent = e.data;
-    logBox.appendChild(line);
-    logBox.scrollTop = logBox.scrollHeight;
-  });
+    _src = new EventSource(rootPath + '/wizard/' + token + '/stream/upload');
 
-  src.addEventListener('done', function(e) {
-    src.close();
-    const d = JSON.parse(e.data);
-    const res = document.getElementById('upload-result');
-    if (d.exit_code === 0) {
-      res.innerHTML = '<div class="alert alert-ok">✅ Upload completato con successo!</div>' +
-        '<a href="' + rootPath + '/uploaded" class="btn btn-secondary mt-2">Vai a Caricati</a>';
-    } else {
-      res.innerHTML = '<div class="alert alert-error">❌ unit3dup ha restituito exit code ' + d.exit_code + '</div>';
+    _src.addEventListener('log', function(e) {
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      line.textContent = e.data;
+      logBox.appendChild(line);
+      logBox.scrollTop = logBox.scrollHeight;
+    });
+
+    _src.addEventListener('input_needed', function(e) {
+      // unit3dup is waiting for user input — show the inline prompt
+      document.getElementById('stdin-prompt-text').textContent = e.data;
+      const area = document.getElementById('stdin-input-area');
+      area.style.display = 'block';
+      const inp = document.getElementById('stdin-value');
+      inp.value = '';
+      inp.focus();
+      logBox.scrollTop = logBox.scrollHeight;
+    });
+
+    _src.addEventListener('done', function(e) {
+      _src.close();
+      document.getElementById('stdin-input-area').style.display = 'none';
+      const d = JSON.parse(e.data);
+      const res = document.getElementById('upload-result');
+      if (d.exit_code === 0) {
+        res.innerHTML = '<div class="alert alert-ok">✅ Upload completato con successo!</div>' +
+          '<a href="' + rootPath + '/uploaded" class="btn btn-secondary mt-2">Vai a Caricati</a>';
+      } else {
+        res.innerHTML = '<div class="alert alert-error">❌ unit3dup ha restituito exit code ' + d.exit_code + '</div>';
+      }
+      document.getElementById('upload-btn').style.display = 'none';
+    });
+
+    _src.addEventListener('error', function(e) {
+      _src.close();
+      document.getElementById('stdin-input-area').style.display = 'none';
+      document.getElementById('upload-result').innerHTML =
+        '<div class="alert alert-error">❌ ' + (e.data || 'Errore SSE') + '</div>';
+    });
+
+    _src.onerror = function() { _src.close(); };
+  };
+
+  window.submitStdin = function() {
+    const value = document.getElementById('stdin-value').value.trim() || '0';
+    document.getElementById('stdin-input-area').style.display = 'none';
+    fetch(rootPath + '/wizard/' + token + '/stdin', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value: value})
+    });
+  };
+
+  // Allow Enter key in the input field
+  document.addEventListener('DOMContentLoaded', function() {
+    var inp = document.getElementById('stdin-value');
+    if (inp) {
+      inp.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Enter') window.submitStdin();
+      });
     }
-    document.getElementById('upload-btn').style.display = 'none';
   });
-
-  src.addEventListener('error', function(e) {
-    src.close();
-    document.getElementById('upload-result').innerHTML =
-      '<div class="alert alert-error">❌ ' + (e.data || 'Errore SSE') + '</div>';
-  });
-
-  src.onerror = function() { src.close(); };
-}
+})();
 </script>
 {% endif %}

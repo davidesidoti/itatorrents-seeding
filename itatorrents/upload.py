@@ -4,7 +4,7 @@ import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from guessit import guessit
 
@@ -105,8 +105,33 @@ def do_hardlink_series(
     return target_dir
 
 
-async def stream_unit3dup(args: list[str]) -> AsyncGenerator[dict, None]:
-    """Async generator yielding {'type': 'log'|'done', 'data': str, 'exit_code': int}."""
+# Patterns that indicate unit3dup is waiting for user input on stdin.
+# These prompts don't end with \n so readline() would block forever.
+_PROMPT_PATTERNS = [
+    "Please digit a valid TMDB ID",
+    "Please digit a valid",
+    "digit a valid",
+    "insert a valid",
+]
+
+
+def _is_prompt(text: str) -> bool:
+    t = text.strip()
+    return any(p.lower() in t.lower() for p in _PROMPT_PATTERNS)
+
+
+async def stream_unit3dup(
+    args: list[str],
+    input_queue: Optional[asyncio.Queue] = None,
+) -> AsyncGenerator[dict, None]:
+    """Async generator yielding event dicts:
+      {'type': 'log',         'data': str}
+      {'type': 'input_needed','data': str}   — unit3dup waiting for stdin
+      {'type': 'error',       'data': str}
+      {'type': 'done',        'data': '', 'exit_code': int}
+    When input_queue is provided, responses typed by the user are put there
+    and forwarded to the subprocess stdin.
+    """
     # Systemd user services have a minimal PATH; augment with common user bin dirs
     # so unit3dup installed via pyenv/pip/~/.local is found even from the service.
     home = str(Path.home())
@@ -127,12 +152,16 @@ async def stream_unit3dup(args: list[str]) -> AsyncGenerator[dict, None]:
     current_ldpath = env.get("LD_LIBRARY_PATH", "")
     env["LD_LIBRARY_PATH"] = local_lib + (os.pathsep + current_ldpath if current_ldpath else "")
 
+    # Force unbuffered output so prompts (no trailing \n) arrive immediately.
+    env["PYTHONUNBUFFERED"] = "1"
+
     # Resolve absolute path if possible (avoids relying on PATH at exec time)
     unit3dup_bin = shutil.which("unit3dup", path=env["PATH"]) or "unit3dup"
 
     try:
         proc = await asyncio.create_subprocess_exec(
             unit3dup_bin, *args,
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             env=env,
@@ -142,10 +171,44 @@ async def stream_unit3dup(args: list[str]) -> AsyncGenerator[dict, None]:
         return
 
     assert proc.stdout is not None
-    async for line in proc.stdout:
-        decoded = line.decode("utf-8", errors="replace").rstrip()
-        if decoded:
-            yield {"type": "log", "data": decoded}
+    assert proc.stdin is not None
+
+    buf = ""
+    while True:
+        try:
+            chunk = await asyncio.wait_for(proc.stdout.read(512), timeout=0.3)
+        except asyncio.TimeoutError:
+            # Nothing arrived — if buffer looks like a prompt, ask the user.
+            if buf and _is_prompt(buf):
+                yield {"type": "input_needed", "data": buf.strip()}
+                user_input = (await input_queue.get()) if input_queue is not None else "0"
+                proc.stdin.write((user_input + "\n").encode())
+                await proc.stdin.drain()
+                buf = ""
+            continue
+
+        if not chunk:
+            # EOF from process
+            if buf.strip():
+                yield {"type": "log", "data": buf.rstrip()}
+            break
+
+        text = chunk.decode("utf-8", errors="replace")
+        buf += text
+
+        # Flush any complete lines from the buffer
+        while "\n" in buf:
+            line, buf = buf.split("\n", 1)
+            if line.strip():
+                yield {"type": "log", "data": line}
+
+        # Partial line remaining — check if it's already a prompt
+        if buf and _is_prompt(buf):
+            yield {"type": "input_needed", "data": buf.strip()}
+            user_input = (await input_queue.get()) if input_queue is not None else "0"
+            proc.stdin.write((user_input + "\n").encode())
+            await proc.stdin.drain()
+            buf = ""
 
     exit_code = await proc.wait()
     yield {"type": "done", "data": "", "exit_code": exit_code}

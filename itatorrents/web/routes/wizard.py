@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from ...core import tmdb_fetch, tmdb_poster_url, tmdb_year
@@ -381,17 +381,24 @@ async def wizard_upload_stream(request: Request, token: str):
 
     args = ["-b", "-u" if kind == "movie" else "-f", seeding_path]
 
+    # One queue per upload session; POST /wizard/{token}/stdin puts values here.
+    input_queue: asyncio.Queue = asyncio.Queue()
+    state["stdin_queue"] = input_queue
+
     async def generate() -> AsyncGenerator[dict, None]:
         exit_code = 0
-        async for event in stream_unit3dup(args):
+        async for event in stream_unit3dup(args, input_queue=input_queue):
             if event["type"] == "log":
                 yield {"event": "log", "data": event["data"]}
+            elif event["type"] == "input_needed":
+                yield {"event": "input_needed", "data": event["data"]}
             elif event["type"] == "error":
                 yield {"event": "error", "data": event["data"]}
             elif event["type"] == "done":
                 exit_code = event.get("exit_code", -1)
                 state["exit_code"] = exit_code
                 state["upload_done"] = True
+                state.pop("stdin_queue", None)
                 await update_exit_code(seeding_path, exit_code)
                 yield {
                     "event": "done",
@@ -399,3 +406,16 @@ async def wizard_upload_stream(request: Request, token: str):
                 }
 
     return EventSourceResponse(generate())
+
+
+@router.post("/wizard/{token}/stdin")
+async def wizard_stdin(token: str, request: Request):
+    """Forward user input to the running unit3dup subprocess stdin."""
+    state = _get_session(token)
+    q: asyncio.Queue | None = state.get("stdin_queue")
+    if q is None:
+        return JSONResponse({"error": "no active process"}, status_code=400)
+    body = await request.json()
+    value = str(body.get("value", "0")).strip() or "0"
+    await q.put(value)
+    return JSONResponse({"ok": True})
