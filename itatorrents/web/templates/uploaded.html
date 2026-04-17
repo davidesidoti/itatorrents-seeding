@@ -50,7 +50,9 @@
         </td>
         <td>
           <button class="btn-delete"
-                  onclick="deleteRow(this, {{ item.seeding_path | tojson }}, 'row-{{ loop.index }}')"
+                  data-path="{{ item.seeding_path | e }}"
+                  data-row="row-{{ loop.index }}"
+                  data-delete-file="1"
                   title="Cancella">✕</button>
         </td>
       </tr>
@@ -78,7 +80,9 @@
         <td class="muted">{{ r.uploaded_at[:16] }}</td>
         <td>
           <button class="btn-delete"
-                  onclick="deleteRow(this, {{ r.seeding_path | tojson }}, 'orphan-{{ loop.index }}', false)"
+                  data-path="{{ r.seeding_path | e }}"
+                  data-row="orphan-{{ loop.index }}"
+                  data-delete-file="0"
                   title="Rimuovi record">✕</button>
         </td>
       </tr>
@@ -92,8 +96,11 @@
 (function() {
   const rootPath = {{ root_path | tojson }};
 
-  window.deleteRow = function(btn, seedingPath, rowId, deleteFile) {
-    if (deleteFile === undefined) deleteFile = true;
+  function deleteRow(btn) {
+    const seedingPath = btn.dataset.path;
+    const rowId = btn.dataset.row;
+    const deleteFile = btn.dataset.deleteFile !== '0';
+
     const msg = deleteFile
       ? 'Cancellare il record dal DB e rimuovere il file da ~/seedings/?\n\n' + seedingPath
       : 'Rimuovere il record dal DB?\n\n' + seedingPath;
@@ -127,7 +134,11 @@
         btn.textContent = '✕';
         alert('Errore di rete.');
       });
-  };
+  }
+
+  document.querySelectorAll('.btn-delete').forEach(function(btn) {
+    btn.addEventListener('click', function() { deleteRow(btn); });
+  });
 })();
 </script>
 {% endblock %}
