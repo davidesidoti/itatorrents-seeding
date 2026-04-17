@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from sse_starlette.sse import EventSourceResponse
 
 from ...core import tmdb_fetch, tmdb_poster_url, tmdb_year
-from ..templates_env import templates
+from ..templates_env import ROOT_PATH, templates
 from ...upload import (
     build_episode_names,
     build_movie_name_from_file,
@@ -98,7 +98,7 @@ async def wizard_start(
     })
     return HTMLResponse(
         status_code=303,
-        headers={"Location": f"/wizard/{token}"},
+        headers={"Location": f"{ROOT_PATH}/wizard/{token}"},
     )
 
 
