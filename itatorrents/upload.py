@@ -120,6 +120,13 @@ async def stream_unit3dup(args: list[str]) -> AsyncGenerator[dict, None]:
     current_path = env.get("PATH", "")
     env["PATH"] = os.pathsep.join(extra_dirs) + os.pathsep + current_path
 
+    # Ensure user-compiled libsqlite3 (in ~/.local/lib) is loaded at runtime.
+    # The system libsqlite3 on Ultra.cc is 3.8.6 (lacks sqlite3_deserialize);
+    # pyenv Python must pick up the newer one built from source.
+    local_lib = os.path.join(home, ".local", "lib")
+    current_ldpath = env.get("LD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = local_lib + (os.pathsep + current_ldpath if current_ldpath else "")
+
     # Resolve absolute path if possible (avoids relying on PATH at exec time)
     unit3dup_bin = shutil.which("unit3dup", path=env["PATH"]) or "unit3dup"
 
