@@ -1,0 +1,2 @@
+pymediainfo>=6.0
+guessit>=3.8
