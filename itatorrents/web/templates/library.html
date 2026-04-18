@@ -1,27 +1,33 @@
 {% extends "base.html" %}
 {% block title %}{{ label }} — ItaTorrents{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">
-    {% if category == 'movies' %}🎬{% elif category == 'series' %}📺{% else %}🎌{% endif %}
-    {{ label }}
-  </h1>
-  <span class="badge" id="item-count">{{ items | length }} elementi</span>
+<div class="page-header library-page-header">
+  <div class="page-header-left">
+    <h1 class="page-title">
+      {% if category == 'movies' %}🎬{% elif category == 'series' %}📺{% else %}🎌{% endif %}
+      {{ label }}
+    </h1>
+    <span class="badge" id="item-count">{{ items | length }} elementi</span>
+  </div>
+  {% if items %}
+  <div class="library-toolbar">
+    <div class="lib-search-wrap">
+      <span class="lib-search-icon">🔍</span>
+      <input type="search" id="lib-search" class="lib-search-input" placeholder="Cerca titolo…" autocomplete="off">
+    </div>
+    <select id="lib-sort" class="lib-sort-select">
+      <option value="name-asc">Nome A→Z</option>
+      <option value="name-desc">Nome Z→A</option>
+      <option value="year-desc">Anno ↓</option>
+      <option value="year-asc">Anno ↑</option>
+      <option value="size-desc">Dim. ↓</option>
+      <option value="size-asc">Dim. ↑</option>
+    </select>
+  </div>
+  {% endif %}
 </div>
 
 {% if items %}
-{# ── Toolbar: search + sort ── #}
-<div class="library-toolbar">
-  <input type="search" id="lib-search" class="lib-search-input" placeholder="Cerca…" autocomplete="off">
-  <select id="lib-sort" class="lib-sort-select">
-    <option value="name-asc">Nome A→Z</option>
-    <option value="name-desc">Nome Z→A</option>
-    <option value="year-desc">Anno ↓</option>
-    <option value="year-asc">Anno ↑</option>
-    <option value="size-desc">Dim. ↓</option>
-    <option value="size-asc">Dim. ↑</option>
-  </select>
-</div>
 
 <div class="grid" id="media-grid">
   {% for item in items %}
@@ -66,20 +72,19 @@
         {% else %}
         <span class="tag tag-muted">{{ item.total_files }} file</span>
         {% endif %}
-        {# Lang tags #}
-        <span class="lang-tags" data-path="{{ item.path }}">
-          {% if item.lang_scanned %}
-            {% if item.available_langs %}
-              {% for lang in item.available_langs %}
-              <span class="tag tag-lang{% if lang == 'ITA' %} tag-lang-ita{% endif %}">{{ lang }}</span>
-              {% endfor %}
-            {% else %}
-              <span class="tag tag-muted">nessuna lingua</span>
-            {% endif %}
+      </div>
+      <div class="lang-tags" data-path="{{ item.path }}">
+        {% if item.lang_scanned %}
+          {% if item.available_langs %}
+            {% for lang in item.available_langs %}
+            <span class="tag tag-lang{% if lang == 'ITA' %} tag-lang-ita{% endif %}">{{ lang }}</span>
+            {% endfor %}
           {% else %}
-            <span class="tag tag-lang-unknown">⏳</span>
+            <span class="tag tag-muted tag-sm">nessuna lingua</span>
           {% endif %}
-        </span>
+        {% else %}
+          <span class="tag tag-lang-unknown">⏳ scan</span>
+        {% endif %}
       </div>
     </div>
   </a>
