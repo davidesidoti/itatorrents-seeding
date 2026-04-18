@@ -67,7 +67,15 @@
         summary.innerHTML = '<div class="alert alert-ok">✅ Italiano trovato in tutti i ' + d.total + ' file.</div>';
         htmx.ajax('GET', rootPath + '/wizard/' + token + '/tmdb-form', {target: '#tmdb-form-container', swap: 'innerHTML'});
       } else {
-        summary.innerHTML = '<div class="alert alert-error">❌ Uno o più file non hanno traccia italiana. Upload annullato.</div>';
+        summary.innerHTML =
+          '<div class="alert alert-error">❌ Uno o più file non hanno traccia italiana rilevata.</div>' +
+          '<div style="margin-top:10px;display:flex;gap:10px;align-items:center">' +
+          '<button class="btn btn-primary" ' +
+          'hx-post="' + rootPath + '/wizard/' + token + '/audio-override" ' +
+          'hx-target="#wizard-content" hx-swap="innerHTML">Procedi comunque</button>' +
+          '<span class="muted" style="font-size:12px">La traccia potrebbe non essere taggata correttamente nel file.</span>' +
+          '</div>';
+        htmx.process(summary);
       }
     });
 

@@ -64,6 +64,11 @@ def _audio_langs(track) -> list[str]:
     other = getattr(track, "other_language", None)
     if other:
         cands.extend(other if isinstance(other, list) else [other])
+    # Fallback: if no language tag, try track title (some muxers store "Italian", "ITA", etc. there)
+    if not cands:
+        title = getattr(track, "title", None) or ""
+        if title:
+            cands.append(title)
     return [c for c in cands if c]
 
 
@@ -84,7 +89,13 @@ def audio_languages(path: Path) -> list[str]:
         if track.track_type != "Audio":
             continue
         for c in _audio_langs(track):
-            code = LANG_MAP.get(c.lower().strip())
+            normalized = c.lower().strip()
+            # Handle IETF tags like "it-IT", "en-US" → use primary subtag
+            if "-" in normalized and "_" not in normalized:
+                normalized = normalized.split("-")[0]
+            elif "_" in normalized:
+                normalized = normalized.split("_")[0]
+            code = LANG_MAP.get(normalized)
             if code and code not in seen:
                 seen.append(code)
     # ITA first, rest alpha
@@ -103,8 +114,14 @@ def has_italian_audio(path: Path) -> bool:
     for track in info.tracks:
         if track.track_type != "Audio":
             continue
-        if any(c.lower().strip() in ITA_TAGS for c in _audio_langs(track)):
-            return True
+        for c in _audio_langs(track):
+            normalized = c.lower().strip()
+            if "-" in normalized and "_" not in normalized:
+                normalized = normalized.split("-")[0]
+            elif "_" in normalized:
+                normalized = normalized.split("_")[0]
+            if normalized in ITA_TAGS:
+                return True
     return False
 
 

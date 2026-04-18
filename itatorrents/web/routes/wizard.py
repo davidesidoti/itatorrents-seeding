@@ -166,6 +166,23 @@ async def wizard_audio_stream(request: Request, token: str):
 
 
 # ---------------------------------------------------------------------------
+# Step 1b: Audio override — force-proceed despite failed Italian check
+# ---------------------------------------------------------------------------
+
+@router.post("/wizard/{token}/audio-override", response_class=HTMLResponse)
+async def wizard_audio_override(request: Request, token: str):
+    state = _get_session(token)
+    state["audio_ok"] = True
+    state["audio_override"] = True
+    state["step"] = "tmdb"
+    return templates.TemplateResponse(request, "wizard_fragments/tmdb_form.html", {
+        "token": token,
+        "state": state,
+        "tmdb_error": "",
+    })
+
+
+# ---------------------------------------------------------------------------
 # Step 2a: TMDB form (GET, loaded by HTMX after SSE audio done)
 # ---------------------------------------------------------------------------
 
