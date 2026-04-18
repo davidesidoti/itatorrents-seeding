@@ -33,7 +33,6 @@ def _default_tmdb_kind(item) -> str:
 async def _enrich_item(item, cache: dict, uploaded_source_paths: set, lang_cache: dict | None = None):
     """Inject TMDB cache + upload status + lang cache into a MediaItem in-place."""
     sp = str(item.path)                    # unresolved — cache key
-    sp_resolved = str(item.path.resolve()) # resolved — DB comparison
 
     # TMDB from series-level cache key
     tmdb = cache.get(sp)
@@ -50,10 +49,19 @@ async def _enrich_item(item, cache: dict, uploaded_source_paths: set, lang_cache
     if item.kind == "series":
         all_langs: list[str] = []
         any_scanned = False
+        uploaded_season_numbers: list[int] = []
         for season in item.seasons:
             ssp = str(season.path)
             ssp_resolved = str(season.path.resolve())
             season.already_uploaded = ssp_resolved in uploaded_source_paths
+            uploaded_episode_paths: set[str] = set()
+            for vf in season.video_files:
+                vf_resolved = str(vf.resolve())
+                if vf_resolved in uploaded_source_paths:
+                    uploaded_episode_paths.add(vf_resolved)
+            season.uploaded_episode_paths = uploaded_episode_paths
+            if season.already_uploaded or season.all_episodes_uploaded:
+                uploaded_season_numbers.append(season.number)
             # Fall back to season-level cache if series level has none
             if not item.tmdb_id:
                 s_tmdb = cache.get(ssp)
@@ -76,7 +84,7 @@ async def _enrich_item(item, cache: dict, uploaded_source_paths: set, lang_cache
                     for lang in season.available_langs:
                         if lang not in all_langs:
                             all_langs.append(lang)
-        item.uploaded_season_numbers = [s.number for s in item.seasons if s.already_uploaded]
+        item.uploaded_season_numbers = uploaded_season_numbers
         if any_scanned:
             # ITA first
             has_ita = "ITA" in all_langs
@@ -126,6 +134,8 @@ async def library_list(request: Request, category: str):
         if item.kind == "movie":
             if str(item.path.resolve()) in uploaded_source_paths:
                 continue  # hide already-uploaded movies
+        elif item.kind == "series" and item.all_seasons_uploaded:
+            continue  # hide series when all seasons are covered
         filtered.append(item)
 
     has_missing_tmdb = any(not i.tmdb_id for i in filtered)
@@ -406,8 +416,9 @@ async def library_mark_uploaded(
     category: str,
     item_name: str,
     season_path: str = Form(""),
+    episode_path: str = Form(""),
 ):
-    """Create a manual DB record so this item is filtered from the library."""
+    """Create a manual DB record so item/season/episode is filtered from library."""
     if category not in CATEGORIES:
         raise HTTPException(404, "Categoria non trovata")
     item = get_item(category, item_name)
@@ -416,8 +427,11 @@ async def library_mark_uploaded(
 
     from pathlib import Path as _Path
 
-    # source_path: season-level for series, item-level for movies
-    if season_path:
+    # source_path: episode-level > season-level > item-level
+    if episode_path:
+        source_path = str(_Path(episode_path).resolve())
+        kind = "episode"
+    elif season_path:
         source_path = str(_Path(season_path).resolve())
         kind = "series"
     else:

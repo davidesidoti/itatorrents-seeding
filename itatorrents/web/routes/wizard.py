@@ -83,6 +83,10 @@ async def wizard_start(
     hardlink_only: str = Form("0"),
 ):
     abs_path = _validate_media_path(path)
+    if kind not in {"movie", "series", "episode"}:
+        raise HTTPException(400, "Invalid kind")
+    if kind == "episode" and not abs_path.is_file():
+        raise HTTPException(400, "Episode mode requires a single file path")
     token = _create_session({
         "path": str(abs_path),
         "category": category,
@@ -90,7 +94,7 @@ async def wizard_start(
         "step": "audio",
         "audio_ok": False,
         "tmdb_id": tmdb_id.strip(),
-        "tmdb_kind": tmdb_kind.strip() or ("tv" if kind == "series" else "movie"),
+        "tmdb_kind": tmdb_kind.strip() or ("tv" if kind in {"series", "episode"} else "movie"),
         "tmdb_title": "",
         "tmdb_year": "",
         "tmdb_poster": "",
@@ -127,7 +131,7 @@ async def wizard_audio_stream(request: Request, token: str):
     state = _get_session(token)
     path = Path(state["path"])
 
-    from ...core import has_italian_audio, iter_video_files, VIDEO_EXTENSIONS
+    from ...core import has_italian_audio, iter_video_files
     if path.is_file():
         video_files = [path]
     else:
@@ -252,7 +256,6 @@ async def wizard_tmdb(
     kind = state["kind"]
 
     from ...core import iter_video_files
-    from guessit import guessit
 
     if kind == "movie":
         if path.is_file():
@@ -266,6 +269,29 @@ async def wizard_tmdb(
                 None, build_movie_name_from_file, vf, title, year
             )
             proposed[str(vf)] = name
+    elif kind == "episode":
+        from guessit import guessit as _guessit
+        if path.is_file():
+            episode_file = path
+        else:
+            files = list(iter_video_files(path))
+            if not files:
+                raise HTTPException(400, "No video file found for episode mode")
+            episode_file = files[0]
+        season_folder = episode_file.parent
+        folder_guess = dict(_guessit(season_folder.name))
+        loop3 = asyncio.get_event_loop()
+        proposed = await loop3.run_in_executor(
+            None,
+            lambda: {str(k): v for k, v in build_episode_names(
+                season_folder, [episode_file], title, year, folder_guess
+            ).items()},
+        )
+        if not proposed:
+            fallback = await loop3.run_in_executor(
+                None, build_movie_name_from_file, episode_file, title, year
+            )
+            proposed = {str(episode_file): fallback}
     else:
         # series / season folder
         from guessit import guessit as _guessit
@@ -341,6 +367,7 @@ async def wizard_hardlink(request: Request, token: str):
 
     errors: list[str] = []
     seeding_path = ""
+    source_path = str(path.resolve())
 
     try:
         loop = asyncio.get_event_loop()
@@ -356,16 +383,31 @@ async def wizard_hardlink(request: Request, token: str):
                 None, do_hardlink_movie, src_file, final_name
             )
             seeding_path = str(target)
+            source_path = str(path.resolve())
+        elif kind == "episode":
+            if path.is_file():
+                src_file = path
+            else:
+                from ...core import iter_video_files
+                files = list(iter_video_files(path))
+                if not files:
+                    raise HTTPException(400, "No video file found for episode mode")
+                src_file = files[0]
+            final_name = next(iter(final_names.values()), src_file.stem)
+            target = await loop.run_in_executor(
+                None, do_hardlink_movie, src_file, final_name
+            )
+            seeding_path = str(target)
+            source_path = str(src_file.resolve())
         else:
             # series
-            from ...core import iter_video_files
-            video_files = list(iter_video_files(path))
             episode_rename = {Path(k): v for k, v in final_names.items()}
             folder_name = state.get("folder_name", path.name)
             target = await loop.run_in_executor(
                 None, do_hardlink_series, path, folder_name, episode_rename
             )
             seeding_path = str(target)
+            source_path = str(path.resolve())
 
         state["seeding_path"] = seeding_path
         state["step"] = "upload"
@@ -374,7 +416,7 @@ async def wizard_hardlink(request: Request, token: str):
         await record_upload(
             category=state["category"],
             kind=kind,
-            source_path=str(path),
+            source_path=source_path,
             seeding_path=seeding_path,
             tmdb_id=state.get("tmdb_id", ""),
             title=state.get("tmdb_title", ""),
@@ -409,7 +451,7 @@ async def wizard_upload_stream(request: Request, token: str):
             yield {"event": "error", "data": "No seeding path set"}
         return EventSourceResponse(_err())
 
-    args = ["-b", "-u" if kind == "movie" else "-f", seeding_path]
+    args = ["-b", "-u" if kind in {"movie", "episode"} else "-f", seeding_path]
     tmdb_id = state.get("tmdb_id", "")
 
     # One queue per upload session; POST /wizard/{token}/stdin puts values here.

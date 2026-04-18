@@ -27,6 +27,7 @@ class Season:
     path: Path
     video_files: list[Path] = field(default_factory=list)
     already_uploaded: bool = False
+    uploaded_episode_paths: set[str] = field(default_factory=set)
     # Lang cache fields (populated by routes)
     available_langs: list = field(default_factory=list)
     lang_scanned: bool = False
@@ -52,6 +53,15 @@ class Season:
     @property
     def has_italian(self) -> bool:
         return "ITA" in self.available_langs
+
+    @property
+    def all_episodes_uploaded(self) -> bool:
+        episode_paths = {str(f.resolve()) for f in self.video_files}
+        return bool(episode_paths) and episode_paths.issubset(self.uploaded_episode_paths)
+
+    @property
+    def remaining_episode_count(self) -> int:
+        return max(0, self.episode_count - len(self.uploaded_episode_paths))
 
 
 @dataclass
@@ -110,6 +120,14 @@ class MediaItem:
     @property
     def has_italian(self) -> bool:
         return "ITA" in self.available_langs
+
+    @property
+    def all_seasons_uploaded(self) -> bool:
+        if self.kind != "series":
+            return self.already_uploaded
+        if not self.seasons:
+            return False
+        return all(s.already_uploaded or s.all_episodes_uploaded for s in self.seasons)
 
 
 def _iter_video(folder: Path) -> list[Path]:

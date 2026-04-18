@@ -32,7 +32,7 @@
       <div class="form-group">
         <label for="tmdb_kind">Tipo</label>
         <select name="tmdb_kind" id="tmdb_kind">
-          {% set preselect_tv = state.get('tmdb_kind') == 'tv' or (not state.get('tmdb_kind') and state.kind == 'series') %}
+          {% set preselect_tv = state.get('tmdb_kind') == 'tv' or (not state.get('tmdb_kind') and state.kind in ['series', 'episode']) %}
           {% if preselect_tv %}
           <option value="tv" selected>TV / Serie</option>
           <option value="movie">Film</option>
