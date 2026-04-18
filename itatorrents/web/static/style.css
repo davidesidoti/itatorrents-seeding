@@ -607,3 +607,83 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
   border-top: 1px solid var(--border);
   margin-top: 4px;
 }
+
+/* ── Lang color coding ── */
+.card-has-ita  { border-left: 4px solid var(--green); }
+.card-no-ita   { border-left: 4px solid var(--red); }
+.card-lang-unknown { border-left: 4px solid var(--border); }
+
+/* ── Lang tags ── */
+.tag-lang          { background: rgba(100, 116, 139, 0.2); color: var(--text-muted); }
+.tag-lang-ita      { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+.tag-lang-unknown  { background: transparent; color: var(--text-muted); padding: 1px 2px; }
+.tag-uploaded      { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+.lang-tags         { display: contents; }
+
+/* ── Library toolbar: search + sort ── */
+.library-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.lib-search-input {
+  flex: 1;
+  min-width: 160px;
+  max-width: 340px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.lib-search-input:focus { border-color: var(--accent); }
+.lib-sort-select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.lib-sort-select:focus { border-color: var(--accent); }
+
+/* ── File size ── */
+.file-size {
+  margin-left: auto;
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: monospace;
+}
+
+/* ── Season size ── */
+.season-size {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ── Season header: allow wrapping with gap ── */
+.season-header {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ── Lang panel ── */
+.lang-panel { margin-top: 10px; }
+
+/* ── Lang scan status bar ── */
+.enrich-bar-lang {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+/* ── card-orig-title ── */
+.card-orig-title { font-size: 11px; margin-bottom: 4px; }

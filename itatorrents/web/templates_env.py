@@ -4,8 +4,11 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
+from ..media import format_size
+
 ROOT_PATH = os.environ.get("ITA_ROOT_PATH", "")  # e.g. "/itatorrents" on Ultra.cc
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 templates.env.globals["root_path"] = ROOT_PATH
+templates.env.globals["format_size"] = format_size

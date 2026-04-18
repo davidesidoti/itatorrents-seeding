@@ -6,15 +6,39 @@
     {% if category == 'movies' %}🎬{% elif category == 'series' %}📺{% else %}🎌{% endif %}
     {{ label }}
   </h1>
-  <span class="badge">{{ items | length }} elementi</span>
+  <span class="badge" id="item-count">{{ items | length }} elementi</span>
 </div>
 
 {% if items %}
+{# ── Toolbar: search + sort ── #}
+<div class="library-toolbar">
+  <input type="search" id="lib-search" class="lib-search-input" placeholder="Cerca…" autocomplete="off">
+  <select id="lib-sort" class="lib-sort-select">
+    <option value="name-asc">Nome A→Z</option>
+    <option value="name-desc">Nome Z→A</option>
+    <option value="year-desc">Anno ↓</option>
+    <option value="year-asc">Anno ↑</option>
+    <option value="size-desc">Dim. ↓</option>
+    <option value="size-asc">Dim. ↑</option>
+  </select>
+</div>
+
 <div class="grid" id="media-grid">
   {% for item in items %}
+  {# Determine lang CSS class #}
+  {% if item.lang_scanned %}
+    {% if item.has_italian %}{% set lang_class = "card-has-ita" %}{% else %}{% set lang_class = "card-no-ita" %}{% endif %}
+  {% else %}
+    {% set lang_class = "card-lang-unknown" %}
+  {% endif %}
   <a href="{{ root_path }}/library/{{ category }}/{{ item.name }}"
-     class="card{% if item.uploaded_season_numbers %} card-partial{% endif %}"
-     data-source="{{ item.path }}">
+     class="card {{ lang_class }}{% if item.uploaded_season_numbers %} card-partial{% endif %}"
+     data-source="{{ item.path }}"
+     data-name="{{ (item.tmdb_title or item.title) | lower }}"
+     data-orig="{{ item.title | lower }}"
+     data-year="{{ item.year }}"
+     data-size="{{ item.total_size }}"
+     data-has-ita="{{ 'true' if item.has_italian else ('false' if item.lang_scanned else 'unknown') }}">
     <div class="card-thumb">
       {% if item.tmdb_poster %}
       <img class="card-poster" src="{{ item.tmdb_poster }}" alt="{{ item.title }}" loading="lazy">
@@ -42,6 +66,20 @@
         {% else %}
         <span class="tag tag-muted">{{ item.total_files }} file</span>
         {% endif %}
+        {# Lang tags #}
+        <span class="lang-tags" data-path="{{ item.path }}">
+          {% if item.lang_scanned %}
+            {% if item.available_langs %}
+              {% for lang in item.available_langs %}
+              <span class="tag tag-lang{% if lang == 'ITA' %} tag-lang-ita{% endif %}">{{ lang }}</span>
+              {% endfor %}
+            {% else %}
+              <span class="tag tag-muted">nessuna lingua</span>
+            {% endif %}
+          {% else %}
+            <span class="tag tag-lang-unknown">⏳</span>
+          {% endif %}
+        </span>
       </div>
     </div>
   </a>
@@ -55,37 +93,168 @@
 </div>
 {% endif %}
 
+{# ── Status bars ── #}
 {% if has_missing_tmdb %}
 <div id="enrich-status" class="enrich-bar">
   <span id="enrich-text">⏳ Recupero info TMDB in background…</span>
 </div>
+{% endif %}
+
+{% if has_missing_langs %}
+<div id="lang-scan-status" class="enrich-bar enrich-bar-lang">
+  <span id="lang-scan-text">🔊 Scansione lingue audio in background…</span>
+</div>
+{% endif %}
+
 <script>
 (function() {
   const rootPath = {{ root_path | tojson }};
   const category = {{ category | tojson }};
-  const src = new EventSource(rootPath + '/library/' + category + '/enrich');
+  const storageKeySort = 'ita_' + category + '_sort';
+  const storageKeySearch = 'ita_' + category + '_search';
 
-  src.addEventListener('enriched', function(e) {
-    const d = JSON.parse(e.data);
-    const card = document.querySelector('[data-source="' + d.source_path + '"]');
-    if (!card) return;
-    const thumb = card.querySelector('.card-thumb');
-    if (thumb && d.poster) {
-      thumb.innerHTML = '<img class="card-poster" src="' + d.poster + '" alt="" loading="lazy">';
-    }
-    const titleEl = card.querySelector('.card-title');
-    if (titleEl && d.title) titleEl.textContent = d.title;
-  });
+  // ── Restore persisted state ──
+  const savedSort = localStorage.getItem(storageKeySort) || 'name-asc';
+  const savedSearch = localStorage.getItem(storageKeySearch) || '';
+  const sortEl = document.getElementById('lib-sort');
+  const searchEl = document.getElementById('lib-search');
+  if (sortEl) sortEl.value = savedSort;
+  if (searchEl) searchEl.value = savedSearch;
 
-  src.addEventListener('done', function() {
-    src.close();
-    const bar = document.getElementById('enrich-status');
-    if (bar) bar.remove();
-  });
+  function getCards() {
+    return Array.from(document.querySelectorAll('#media-grid .card'));
+  }
 
-  src.addEventListener('error', function() { src.close(); });
-  src.onerror = function() { src.close(); };
+  function applyFilterSort() {
+    const q = (searchEl ? searchEl.value : '').toLowerCase().trim();
+    const sort = sortEl ? sortEl.value : 'name-asc';
+    const grid = document.getElementById('media-grid');
+    if (!grid) return;
+
+    const cards = getCards();
+    let visible = 0;
+
+    // Filter
+    cards.forEach(function(card) {
+      const name = (card.dataset.name || '');
+      const orig = (card.dataset.orig || '');
+      const match = !q || name.includes(q) || orig.includes(q);
+      card.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+
+    // Update count
+    const countEl = document.getElementById('item-count');
+    if (countEl) countEl.textContent = (q ? visible + ' di ' : '') + cards.length + ' elementi';
+
+    // Sort visible
+    const visibleCards = cards.filter(c => c.style.display !== 'none');
+    visibleCards.sort(function(a, b) {
+      if (sort === 'name-asc') return (a.dataset.name || '').localeCompare(b.dataset.name || '');
+      if (sort === 'name-desc') return (b.dataset.name || '').localeCompare(a.dataset.name || '');
+      if (sort === 'year-desc') return (parseInt(b.dataset.year) || 0) - (parseInt(a.dataset.year) || 0);
+      if (sort === 'year-asc') return (parseInt(a.dataset.year) || 0) - (parseInt(b.dataset.year) || 0);
+      if (sort === 'size-desc') return (parseInt(b.dataset.size) || 0) - (parseInt(a.dataset.size) || 0);
+      if (sort === 'size-asc') return (parseInt(a.dataset.size) || 0) - (parseInt(b.dataset.size) || 0);
+      return 0;
+    });
+    visibleCards.forEach(function(card) { grid.appendChild(card); });
+  }
+
+  if (sortEl) {
+    sortEl.addEventListener('change', function() {
+      localStorage.setItem(storageKeySort, sortEl.value);
+      applyFilterSort();
+    });
+  }
+  if (searchEl) {
+    searchEl.addEventListener('input', function() {
+      localStorage.setItem(storageKeySearch, searchEl.value);
+      applyFilterSort();
+    });
+  }
+
+  // Apply on load
+  applyFilterSort();
+
+  // ── TMDB enrich SSE ──
+  {% if has_missing_tmdb %}
+  (function() {
+    const src = new EventSource(rootPath + '/library/' + category + '/enrich');
+    src.addEventListener('enriched', function(e) {
+      const d = JSON.parse(e.data);
+      const card = document.querySelector('[data-source="' + d.source_path + '"]');
+      if (!card) return;
+      const thumb = card.querySelector('.card-thumb');
+      if (thumb && d.poster) {
+        thumb.innerHTML = '<img class="card-poster" src="' + d.poster + '" alt="" loading="lazy">';
+      }
+      const titleEl = card.querySelector('.card-title');
+      if (titleEl && d.title) {
+        titleEl.textContent = d.title;
+        card.dataset.name = d.title.toLowerCase();
+      }
+    });
+    src.addEventListener('done', function() {
+      src.close();
+      const bar = document.getElementById('enrich-status');
+      if (bar) bar.remove();
+    });
+    src.addEventListener('error', function() { src.close(); });
+    src.onerror = function() { src.close(); };
+  })();
+  {% endif %}
+
+  // ── Lang scan SSE ──
+  {% if has_missing_langs %}
+  (function() {
+    const src = new EventSource(rootPath + '/library/' + category + '/scan-langs');
+    src.addEventListener('lang_scanned', function(e) {
+      const d = JSON.parse(e.data);
+      // For movies: source_path is item path. For series: source_path is item path, season_path is season.
+      const cardPath = d.source_path;
+      const card = document.querySelector('[data-source="' + cardPath + '"]');
+      if (!card) return;
+
+      // Update lang class
+      card.classList.remove('card-lang-unknown', 'card-has-ita', 'card-no-ita');
+      card.classList.add(d.has_ita ? 'card-has-ita' : 'card-no-ita');
+      card.dataset.hasIta = d.has_ita ? 'true' : 'false';
+
+      // Update lang tags — replace ⏳ or merge new langs
+      const langTagsEl = card.querySelector('.lang-tags[data-path="' + cardPath + '"]');
+      if (langTagsEl && d.langs && d.langs.length) {
+        // We need to union with existing tags for series (multiple SSE events per series)
+        const existing = Array.from(langTagsEl.querySelectorAll('.tag-lang')).map(el => el.textContent.trim());
+        const merged = existing.slice();
+        d.langs.forEach(function(l) { if (!merged.includes(l)) merged.push(l); });
+        // Sort: ITA first
+        merged.sort(function(a, b) {
+          if (a === 'ITA') return -1;
+          if (b === 'ITA') return 1;
+          return a.localeCompare(b);
+        });
+        langTagsEl.innerHTML = merged.map(function(l) {
+          return '<span class="tag tag-lang' + (l === 'ITA' ? ' tag-lang-ita' : '') + '">' + l + '</span>';
+        }).join('');
+        // Recalculate has-ita after all seasons scanned
+        if (merged.includes('ITA')) {
+          card.classList.remove('card-no-ita', 'card-lang-unknown');
+          card.classList.add('card-has-ita');
+          card.dataset.hasIta = 'true';
+        }
+      }
+    });
+    src.addEventListener('done', function() {
+      src.close();
+      const bar = document.getElementById('lang-scan-status');
+      if (bar) bar.remove();
+    });
+    src.addEventListener('error', function() { src.close(); });
+    src.onerror = function() { src.close(); };
+  })();
+  {% endif %}
+
 })();
 </script>
-{% endif %}
 {% endblock %}

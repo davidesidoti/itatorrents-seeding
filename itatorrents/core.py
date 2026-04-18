@@ -66,6 +66,32 @@ def _audio_langs(track) -> list[str]:
     return [c for c in cands if c]
 
 
+def audio_languages(path: Path) -> list[str]:
+    """Return sorted unique normalised language codes for all audio tracks.
+
+    ITA appears first if present; remaining codes are alphabetically sorted.
+    Returns empty list if pymediainfo not available or parse fails.
+    """
+    if MediaInfo is None:
+        return []
+    try:
+        info = MediaInfo.parse(str(path))
+    except Exception:
+        return []
+    seen: list[str] = []
+    for track in info.tracks:
+        if track.track_type != "Audio":
+            continue
+        for c in _audio_langs(track):
+            code = LANG_MAP.get(c.lower().strip())
+            if code and code not in seen:
+                seen.append(code)
+    # ITA first, rest alpha
+    has_ita = "ITA" in seen
+    rest = sorted(c for c in seen if c != "ITA")
+    return (["ITA"] + rest) if has_ita else rest
+
+
 def has_italian_audio(path: Path) -> bool:
     if MediaInfo is None:
         raise RuntimeError("pymediainfo not installed")

@@ -9,6 +9,17 @@ MEDIA_ROOT = Path.home() / "media"
 CATEGORIES = ("movies", "series", "anime")
 
 
+def format_size(size_bytes: int) -> str:
+    """Human-readable file size: GB / MB / KB."""
+    if size_bytes >= 1_073_741_824:
+        return f"{size_bytes / 1_073_741_824:.2f} GB"
+    if size_bytes >= 1_048_576:
+        return f"{size_bytes / 1_048_576:.1f} MB"
+    if size_bytes >= 1_024:
+        return f"{size_bytes / 1_024:.0f} KB"
+    return f"{size_bytes} B"
+
+
 @dataclass
 class Season:
     number: int
@@ -16,10 +27,31 @@ class Season:
     path: Path
     video_files: list[Path] = field(default_factory=list)
     already_uploaded: bool = False
+    # Lang cache fields (populated by routes)
+    available_langs: list = field(default_factory=list)
+    lang_scanned: bool = False
 
     @property
     def episode_count(self) -> int:
         return len(self.video_files)
+
+    @property
+    def total_size(self) -> int:
+        total = 0
+        for f in self.video_files:
+            try:
+                total += f.stat().st_size
+            except OSError:
+                pass
+        return total
+
+    @property
+    def total_size_human(self) -> str:
+        return format_size(self.total_size)
+
+    @property
+    def has_italian(self) -> bool:
+        return "ITA" in self.available_langs
 
 
 @dataclass
@@ -39,6 +71,10 @@ class MediaItem:
     # Upload status (populated by routes)
     already_uploaded: bool = False
     uploaded_season_numbers: list = field(default_factory=list)
+    # Lang cache fields (populated by routes)
+    available_langs: list = field(default_factory=list)
+    episode_langs: dict = field(default_factory=dict)  # str(filepath) -> [langs]
+    lang_scanned: bool = False
 
     @property
     def year(self) -> str:
@@ -54,6 +90,26 @@ class MediaItem:
         if self.kind == "series":
             return sum(s.episode_count for s in self.seasons)
         return len(self.video_files)
+
+    @property
+    def total_size(self) -> int:
+        if self.kind == "series":
+            return sum(s.total_size for s in self.seasons)
+        total = 0
+        for f in self.video_files:
+            try:
+                total += f.stat().st_size
+            except OSError:
+                pass
+        return total
+
+    @property
+    def total_size_human(self) -> str:
+        return format_size(self.total_size)
+
+    @property
+    def has_italian(self) -> bool:
+        return "ITA" in self.available_langs
 
 
 def _iter_video(folder: Path) -> list[Path]:

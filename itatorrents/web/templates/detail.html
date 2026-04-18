@@ -24,6 +24,7 @@
       {% if item.year %}<span class="badge">{{ item.year }}</span>{% endif %}
       <span class="tag tag-{{ item.kind }}">{{ item.kind }}</span>
       <span class="tag tag-muted">{{ item.path }}</span>
+      <span class="tag tag-muted">📦 {{ item.total_size_human }}</span>
     </div>
     {% if item.tmdb_overview %}
     <p class="detail-overview">{{ item.tmdb_overview }}</p>
@@ -97,6 +98,30 @@
   </div>
 </div>
 
+{# ── Lang panel ── #}
+<div class="tmdb-panel lang-panel" id="lang-panel">
+  <div class="tmdb-panel-header">
+    <span class="tmdb-panel-label">
+      🔊 Lingue audio:
+      {% if item.lang_scanned %}
+        {% if item.available_langs %}
+          {% for lang in item.available_langs %}
+          <span class="tag tag-lang{% if lang == 'ITA' %} tag-lang-ita{% endif %}">{{ lang }}</span>
+          {% endfor %}
+        {% else %}
+          <span class="muted">nessuna lingua rilevata</span>
+        {% endif %}
+      {% else %}
+        <span class="muted">⏳ Non scansionato</span>
+      {% endif %}
+    </span>
+    <button class="btn btn-secondary btn-sm" id="rescan-lang-btn" onclick="rescanLangs()">
+      🔄 Riscansiona lingue
+    </button>
+  </div>
+  <div id="rescan-lang-result" style="display:none;margin-top:8px;font-size:13px"></div>
+</div>
+
 {% if item.kind == 'series' %}
   <h2 class="section-title">Stagioni</h2>
   {% if item.seasons %}
@@ -107,16 +132,25 @@
       <div class="season-header">
         <span class="season-label">{{ season.label }}</span>
         <span class="season-count">{{ season.episode_count }} episodi</span>
+        <span class="season-size muted">📦 {{ season.total_size_human }}</span>
+        {% if season.lang_scanned %}
+          {% for lang in season.available_langs %}
+          <span class="tag tag-lang{% if lang == 'ITA' %} tag-lang-ita{% endif %}">{{ lang }}</span>
+          {% endfor %}
+        {% else %}
+          <span class="tag tag-lang-unknown">⏳</span>
+        {% endif %}
       </div>
       <div class="season-files">
         {% for f in season.video_files[:5] %}
         <div class="file-row">
           <span class="file-icon">🎞</span>
           <span class="file-name">{{ f.name }}</span>
+          <span class="file-size muted">{{ format_size(f.stat().st_size) }}</span>
         </div>
         {% endfor %}
         {% if season.video_files | length > 5 %}
-        <div class="file-row muted">+ {{ season.video_files | length - 5 }} altri...</div>
+        <div class="file-row muted">+ {{ season.video_files | length - 5 }} altri…</div>
         {% endif %}
       </div>
       <div class="season-actions">
@@ -158,6 +192,7 @@
     <div class="file-row">
       <span class="file-icon">🎞</span>
       <span class="file-name">{{ f.name }}</span>
+      <span class="file-size muted">{{ format_size(f.stat().st_size) }}</span>
     </div>
     {% endfor %}
   </div>
@@ -185,6 +220,8 @@
 (function() {
   const rootPath = {{ root_path | tojson }};
   const sourcePath = {{ item.path | string | tojson }};
+  const itemName = {{ item.name | tojson }};
+  const category = {{ category | tojson }};
   const defaultKind = {{ (item.tmdb_kind or ('tv' if item.kind == 'series' else 'movie')) | tojson }};
 
   window.toggleTmdbEdit = function() {
@@ -248,6 +285,34 @@
     form.append('source_path', sourcePath);
     fetch(rootPath + '/api/tmdb/clear', { method: 'POST', body: form })
       .then(function() { location.reload(); });
+  };
+
+  window.rescanLangs = function() {
+    const btn = document.getElementById('rescan-lang-btn');
+    const resultEl = document.getElementById('rescan-lang-result');
+    btn.disabled = true;
+    btn.textContent = '⏳ Scansione…';
+    resultEl.style.display = 'none';
+
+    fetch(rootPath + '/library/' + category + '/' + encodeURIComponent(itemName) + '/rescan-langs', {
+      method: 'POST',
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      btn.disabled = false;
+      btn.textContent = '🔄 Riscansiona lingue';
+      if (d.ok) {
+        location.reload();
+      } else {
+        resultEl.style.display = 'block';
+        resultEl.textContent = 'Errore durante la scansione.';
+        resultEl.style.color = 'var(--red)';
+      }
+    }).catch(function() {
+      btn.disabled = false;
+      btn.textContent = '🔄 Riscansiona lingue';
+      resultEl.style.display = 'block';
+      resultEl.textContent = 'Errore di rete.';
+      resultEl.style.color = 'var(--red)';
+    });
   };
 
   // Allow Enter to trigger search

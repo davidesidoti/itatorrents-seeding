@@ -5,12 +5,13 @@ import os
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sse_starlette.sse import EventSourceResponse
 
-from ...core import tmdb_fetch, tmdb_poster_url, tmdb_search, tmdb_year
+from ...core import audio_languages, tmdb_fetch, tmdb_poster_url, tmdb_search, tmdb_year
 from ...media import CATEGORIES, get_item, scan_category
 from ..db import list_uploads, record_upload
+from ..lang_cache import delete_lang, get_lang, get_many_langs, set_lang
 from ..tmdb_cache import get_cache, get_many, set_cache
 from ..templates_env import ROOT_PATH, templates
 
@@ -29,8 +30,8 @@ def _default_tmdb_kind(item) -> str:
     return "tv" if item.kind == "series" else "movie"
 
 
-async def _enrich_item(item, cache: dict, uploaded_source_paths: set):
-    """Inject TMDB cache + upload status into a MediaItem in-place."""
+async def _enrich_item(item, cache: dict, uploaded_source_paths: set, lang_cache: dict | None = None):
+    """Inject TMDB cache + upload status + lang cache into a MediaItem in-place."""
     sp = str(item.path)                    # unresolved — cache key
     sp_resolved = str(item.path.resolve()) # resolved — DB comparison
 
@@ -44,6 +45,8 @@ async def _enrich_item(item, cache: dict, uploaded_source_paths: set):
         item.tmdb_overview = tmdb.get("overview", "")
 
     if item.kind == "series":
+        all_langs: list[str] = []
+        any_scanned = False
         for season in item.seasons:
             ssp = str(season.path)
             ssp_resolved = str(season.path.resolve())
@@ -57,7 +60,31 @@ async def _enrich_item(item, cache: dict, uploaded_source_paths: set):
                     item.tmdb_title = s_tmdb.get("title", "")
                     item.tmdb_poster = s_tmdb.get("poster", "")
                     item.tmdb_overview = s_tmdb.get("overview", "")
+            # Lang cache — per-season
+            if lang_cache is not None:
+                lang_entry = lang_cache.get(ssp)
+                if lang_entry:
+                    season.available_langs = lang_entry.get("langs", [])
+                    season.lang_scanned = True
+                    any_scanned = True
+                    for lang in season.available_langs:
+                        if lang not in all_langs:
+                            all_langs.append(lang)
         item.uploaded_season_numbers = [s.number for s in item.seasons if s.already_uploaded]
+        if any_scanned:
+            # ITA first
+            has_ita = "ITA" in all_langs
+            rest = sorted(c for c in all_langs if c != "ITA")
+            item.available_langs = (["ITA"] + rest) if has_ita else rest
+            item.lang_scanned = True
+    else:
+        # Movie — single entry keyed by item path
+        if lang_cache is not None:
+            lang_entry = lang_cache.get(sp)
+            if lang_entry:
+                item.available_langs = lang_entry.get("langs", [])
+                item.episode_langs = lang_entry.get("episode_langs", {})
+                item.lang_scanned = True
 
     if not item.tmdb_kind:
         item.tmdb_kind = _default_tmdb_kind(item)
@@ -85,16 +112,18 @@ async def library_list(request: Request, category: str):
         for s in item.seasons:
             all_paths.append(str(s.path))
     cache = await get_many(all_paths)
+    lang_cache = await get_many_langs(all_paths)
 
     filtered = []
     for item in items:
-        await _enrich_item(item, cache, uploaded_source_paths)
+        await _enrich_item(item, cache, uploaded_source_paths, lang_cache)
         if item.kind == "movie":
             if str(item.path.resolve()) in uploaded_source_paths:
                 continue  # hide already-uploaded movies
         filtered.append(item)
 
     has_missing_tmdb = any(not i.tmdb_id for i in filtered)
+    has_missing_langs = any(not i.lang_scanned for i in filtered)
 
     return templates.TemplateResponse(request, "library.html", {
         "category": category,
@@ -102,6 +131,7 @@ async def library_list(request: Request, category: str):
         "items": filtered,
         "active": category,
         "has_missing_tmdb": has_missing_tmdb,
+        "has_missing_langs": has_missing_langs,
     })
 
 
@@ -195,6 +225,167 @@ async def library_enrich(request: Request, category: str):
     return EventSourceResponse(generate())
 
 
+@router.get("/library/{category}/scan-langs")
+async def library_scan_langs(request: Request, category: str):
+    """SSE: scan audio languages for items/seasons missing lang cache entries."""
+    if category not in CATEGORIES:
+        raise HTTPException(404, "Categoria non trovata")
+
+    async def generate() -> AsyncGenerator[dict, None]:
+        items = scan_category(category)
+        # Collect all paths to check cache
+        all_paths = []
+        for item in items:
+            if item.kind == "series":
+                for s in item.seasons:
+                    all_paths.append(str(s.path))
+            else:
+                all_paths.append(str(item.path))
+        lang_cache = await get_many_langs(all_paths)
+        loop = asyncio.get_event_loop()
+
+        for item in items:
+            if item.kind == "series":
+                for season in item.seasons:
+                    sp = str(season.path)
+                    if sp in lang_cache:
+                        continue
+                    # Scan all video files in this season
+                    episode_langs: dict[str, list[str]] = {}
+                    all_langs: list[str] = []
+                    for vf in season.video_files:
+                        try:
+                            langs = await loop.run_in_executor(None, audio_languages, vf)
+                        except Exception:
+                            langs = []
+                        episode_langs[str(vf)] = langs
+                        for lang in langs:
+                            if lang not in all_langs:
+                                all_langs.append(lang)
+                        await asyncio.sleep(0.05)
+                    # Normalise: ITA first
+                    has_ita = "ITA" in all_langs
+                    rest = sorted(c for c in all_langs if c != "ITA")
+                    merged = (["ITA"] + rest) if has_ita else rest
+                    await set_lang(sp, merged, episode_langs)
+                    yield {
+                        "event": "lang_scanned",
+                        "data": json.dumps({
+                            "source_path": str(item.path),
+                            "season_path": sp,
+                            "langs": merged,
+                            "has_ita": has_ita,
+                        }),
+                    }
+            else:
+                sp = str(item.path)
+                if sp in lang_cache:
+                    continue
+                episode_langs: dict[str, list[str]] = {}
+                all_langs: list[str] = []
+                for vf in item.video_files:
+                    try:
+                        langs = await loop.run_in_executor(None, audio_languages, vf)
+                    except Exception:
+                        langs = []
+                    episode_langs[str(vf)] = langs
+                    for lang in langs:
+                        if lang not in all_langs:
+                            all_langs.append(lang)
+                    await asyncio.sleep(0.05)
+                has_ita = "ITA" in all_langs
+                rest = sorted(c for c in all_langs if c != "ITA")
+                merged = (["ITA"] + rest) if has_ita else rest
+                await set_lang(sp, merged, episode_langs if len(item.video_files) > 1 else None)
+                yield {
+                    "event": "lang_scanned",
+                    "data": json.dumps({
+                        "source_path": sp,
+                        "season_path": None,
+                        "langs": merged,
+                        "has_ita": has_ita,
+                    }),
+                }
+
+        yield {"event": "done", "data": "{}"}
+
+    return EventSourceResponse(generate())
+
+
+@router.post("/library/{category}/{item_name:path}/rescan-langs")
+async def library_rescan_langs(request: Request, category: str, item_name: str):
+    """Sincrono: force rescan lingue audio per un singolo media. JSON response."""
+    if category not in CATEGORIES:
+        raise HTTPException(404, "Categoria non trovata")
+    item = get_item(category, item_name)
+    if item is None:
+        raise HTTPException(404, f"'{item_name}' non trovato in {category}")
+
+    loop = asyncio.get_event_loop()
+    result: dict = {}
+
+    if item.kind == "series":
+        seasons_result = {}
+        for season in item.seasons:
+            sp = str(season.path)
+            episode_langs: dict[str, list[str]] = {}
+            all_langs: list[str] = []
+            for vf in season.video_files:
+                try:
+                    langs = await loop.run_in_executor(None, audio_languages, vf)
+                except Exception:
+                    langs = []
+                episode_langs[str(vf)] = langs
+                for lang in langs:
+                    if lang not in all_langs:
+                        all_langs.append(lang)
+                await asyncio.sleep(0.05)
+            has_ita = "ITA" in all_langs
+            rest = sorted(c for c in all_langs if c != "ITA")
+            merged = (["ITA"] + rest) if has_ita else rest
+            await set_lang(sp, merged, episode_langs)
+            seasons_result[sp] = {"langs": merged, "episode_langs": episode_langs}
+        # Aggregate all series langs
+        all_series_langs: list[str] = []
+        for s_data in seasons_result.values():
+            for lang in s_data["langs"]:
+                if lang not in all_series_langs:
+                    all_series_langs.append(lang)
+        has_ita_series = "ITA" in all_series_langs
+        rest_series = sorted(c for c in all_series_langs if c != "ITA")
+        merged_series = (["ITA"] + rest_series) if has_ita_series else rest_series
+        result = {
+            "langs": merged_series,
+            "has_ita": has_ita_series,
+            "seasons": seasons_result,
+        }
+    else:
+        sp = str(item.path)
+        episode_langs: dict[str, list[str]] = {}
+        all_langs: list[str] = []
+        for vf in item.video_files:
+            try:
+                langs = await loop.run_in_executor(None, audio_languages, vf)
+            except Exception:
+                langs = []
+            episode_langs[str(vf)] = langs
+            for lang in langs:
+                if lang not in all_langs:
+                    all_langs.append(lang)
+            await asyncio.sleep(0.05)
+        has_ita = "ITA" in all_langs
+        rest = sorted(c for c in all_langs if c != "ITA")
+        merged = (["ITA"] + rest) if has_ita else rest
+        await set_lang(sp, merged, episode_langs if len(item.video_files) > 1 else None)
+        result = {
+            "langs": merged,
+            "has_ita": has_ita,
+            "episode_langs": episode_langs,
+        }
+
+    return JSONResponse({"ok": True, **result})
+
+
 @router.post("/library/{category}/{item_name:path}/mark-uploaded")
 async def library_mark_uploaded(
     request: Request,
@@ -255,7 +446,8 @@ async def library_detail(request: Request, category: str, item_name: str):
 
     all_paths = [str(item.path)] + [str(s.path) for s in item.seasons]
     cache = await get_many(all_paths)
-    await _enrich_item(item, cache, uploaded_source_paths)
+    lang_cache = await get_many_langs(all_paths)
+    await _enrich_item(item, cache, uploaded_source_paths, lang_cache)
 
     return templates.TemplateResponse(request, "detail.html", {
         "item": item,
