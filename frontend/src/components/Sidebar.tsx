@@ -111,30 +111,36 @@ export function Sidebar({ activeView, setActiveView }: Props) {
           letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
           fontFamily: 'var(--font-display)', marginBottom: 8,
         }}>Trackers</div>
-        {trackers.filter((t) => t.configured !== false).map((t) => (
-          <div key={t.name} style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            marginBottom: 6,
-          }}>
-            <span style={{
-              fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-2)',
-            }}>{t.name}</span>
-            <span style={{
-              fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 9999,
-              background: t.online ? 'var(--green-dim)' : 'var(--red-dim)',
-              color: t.online ? 'var(--green)' : 'var(--red)',
-              fontFamily: 'var(--font-display)',
-              display: 'flex', alignItems: 'center', gap: 4,
+        {trackers.map((t) => {
+          const unconfigured = t.configured === false;
+          const bg = unconfigured ? 'var(--border)' : t.online ? 'var(--green-dim)' : 'var(--red-dim)';
+          const fg = unconfigured ? 'var(--fg-4)' : t.online ? 'var(--green)' : 'var(--red)';
+          const dot = unconfigured ? 'var(--fg-4)' : t.online ? 'var(--green)' : 'var(--red)';
+          const label = unconfigured ? 'Not set' : t.online ? 'Online' : 'Offline';
+          return (
+            <div key={t.name} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 6,
             }}>
               <span style={{
-                width: 5, height: 5, borderRadius: '50%',
-                background: t.online ? 'var(--green)' : 'var(--red)',
-                display: 'inline-block',
-              }} />
-              {t.online ? 'Online' : 'Offline'}
-            </span>
-          </div>
-        ))}
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                color: unconfigured ? 'var(--fg-4)' : 'var(--fg-2)',
+              }}>{t.name}</span>
+              <span style={{
+                fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 9999,
+                background: bg, color: fg,
+                fontFamily: 'var(--font-display)',
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <span style={{
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: dot, display: 'inline-block',
+                }} />
+                {label}
+              </span>
+            </div>
+          );
+        })}
         <button
           onClick={logout}
           style={{
