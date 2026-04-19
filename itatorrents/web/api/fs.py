@@ -6,13 +6,13 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
+from ...media import media_root, seedings_root
+
 router = APIRouter(prefix="/api", tags=["fs"])
 
-_ALLOWED_ROOTS = (
-    Path.home() / "media",
-    Path.home() / "seedings",
-    Path.home(),
-)
+
+def _allowed_roots() -> tuple[Path, ...]:
+    return (media_root(), seedings_root(), Path.home())
 
 
 def _is_allowed(p: Path) -> bool:
@@ -20,7 +20,7 @@ def _is_allowed(p: Path) -> bool:
         rp = p.resolve()
     except Exception:
         return False
-    return any(str(rp).startswith(str(r.resolve())) for r in _ALLOWED_ROOTS)
+    return any(str(rp).startswith(str(r.resolve())) for r in _allowed_roots())
 
 
 @router.get("/fs")

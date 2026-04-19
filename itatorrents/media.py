@@ -1,12 +1,29 @@
-"""Library scanner for ~/media/{movies,series,anime}."""
+"""Library scanner for user-configured media root; categories auto-discovered."""
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .core import VIDEO_EXTENSIONS
 
-MEDIA_ROOT = Path.home() / "media"
-CATEGORIES = ("movies", "series", "anime")
+
+def media_root() -> Path:
+    """Resolve media root at call time: env → Unit3Dbot.json → ~/media."""
+    from .web import config
+    return Path(config.runtime_setting("ITA_MEDIA_ROOT", default=str(Path.home() / "media")))
+
+
+def discover_categories() -> list[str]:
+    """Sorted subdirectory names of media_root(). Skips dotfiles & non-dirs."""
+    root = media_root()
+    if not root.exists() or not root.is_dir():
+        return []
+    try:
+        return sorted(
+            c.name for c in root.iterdir()
+            if c.is_dir() and not c.name.startswith(".")
+        )
+    except OSError:
+        return []
 
 
 def format_size(size_bytes: int) -> str:
@@ -142,7 +159,7 @@ def _detect_kind(folder: Path, category: str) -> str:
         return "series"
     if category == "movies":
         return "movie"
-    # anime: has Season XX/ subfolder → series
+    # anime / user-added categories: has Season XX/ subfolder → series
     for child in folder.iterdir():
         if child.is_dir() and re.match(r'[Ss]eason\s+\d+', child.name):
             return "series"
@@ -168,7 +185,7 @@ def _scan_seasons(folder: Path) -> list[Season]:
 
 
 def scan_category(category: str) -> list[MediaItem]:
-    base = MEDIA_ROOT / category
+    base = media_root() / category
     if not base.exists():
         return []
     items = []
@@ -207,7 +224,7 @@ def scan_category(category: str) -> list[MediaItem]:
 
 def get_item(category: str, item_name: str) -> MediaItem | None:
     """Fetch single item by category + folder/file name."""
-    base = MEDIA_ROOT / category
+    base = media_root() / category
     target = base / item_name
     if not target.exists():
         # Try as file without extension
@@ -248,9 +265,14 @@ def get_item(category: str, item_name: str) -> MediaItem | None:
     )
 
 
+def seedings_root() -> Path:
+    from .web import config
+    return Path(config.runtime_setting("ITA_SEEDINGS_DIR", default=str(Path.home() / "seedings")))
+
+
 def scan_seedings() -> list[Path]:
-    """List top-level items in ~/seedings/."""
-    seedings = Path.home() / "seedings"
+    """List top-level items in the configured seedings dir."""
+    seedings = seedings_root()
     if not seedings.exists():
         return []
     return sorted(seedings.iterdir())

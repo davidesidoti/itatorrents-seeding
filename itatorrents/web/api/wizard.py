@@ -66,11 +66,9 @@ def _get(tok: str) -> dict[str, Any]:
 
 
 def _validate_path(p: str) -> Path:
+    from ...media import media_root, seedings_root
     resolved = Path(p).resolve()
-    allowed = [
-        (Path.home() / "media").resolve(),
-        (Path.home() / "seedings").resolve(),
-    ]
+    allowed = [media_root().resolve(), seedings_root().resolve()]
     if not any(str(resolved).startswith(str(a)) for a in allowed):
         raise HTTPException(403, "Path outside allowed directories")
     if not resolved.exists():

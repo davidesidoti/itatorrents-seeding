@@ -6,23 +6,37 @@ import threading
 import time
 from pathlib import Path
 
-DB_PATH = Path(os.environ.get("ITA_DB_PATH", str(Path.home() / ".itatorrents_db.json")))
 _lock = threading.Lock()
 
 
+def _db_path() -> Path:
+    """Re-resolve on every call so UI edits take effect without restart."""
+    try:
+        from . import config
+        return Path(config.runtime_setting("ITA_DB_PATH", default=str(Path.home() / ".itatorrents_db.json")))
+    except Exception:
+        return Path(os.environ.get("ITA_DB_PATH") or (Path.home() / ".itatorrents_db.json"))
+
+
+# Back-compat alias — resolved at import time (tests, external callers).
+DB_PATH = _db_path()
+
+
 def _load() -> list[dict]:
-    if not DB_PATH.exists():
+    path = _db_path()
+    if not path.exists():
         return []
     try:
-        with open(DB_PATH, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError):
         return []
 
 
 def _save(records: list[dict]):
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(DB_PATH, "w", encoding="utf-8") as f:
+    path = _db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(records, f, indent=2, ensure_ascii=False)
 
 
@@ -32,7 +46,7 @@ def _now_iso() -> str:
 
 def _init_db_sync():
     with _lock:
-        if not DB_PATH.exists():
+        if not _db_path().exists():
             _save([])
 
 

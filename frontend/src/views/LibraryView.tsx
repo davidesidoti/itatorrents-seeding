@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Film, Tv, Sparkles, RefreshCw, Database, Headphones,
   Pencil, X, Search as SearchIcon, Star,
+  ChevronDown, Folder, BookOpen, Music, Library as LibraryIcon,
 } from 'lucide-react';
 import { api, openSSE } from '../api';
 import type { Category, LibraryItem, Season, WizardCtx } from '../types';
@@ -29,11 +30,20 @@ interface TmdbSearchResult {
   vote?: number;
 }
 
-const CATS: { id: Category; label: string; icon: any }[] = [
-  { id: 'movies', label: 'Movies', icon: Film },
-  { id: 'series', label: 'Series', icon: Tv },
-  { id: 'anime',  label: 'Anime',  icon: Sparkles },
-];
+interface CategoryInfo { id: string; label: string; count: number; }
+
+const CATEGORY_ICON_MAP: Record<string, any> = {
+  movies: Film, film: Film, movie: Film,
+  series: Tv, tv: Tv, shows: Tv,
+  anime: Sparkles,
+  documentaries: BookOpen, documentary: BookOpen, docs: BookOpen,
+  concerts: Music, concert: Music, music: Music,
+};
+
+const iconFor = (id: string) => {
+  const key = id.toLowerCase();
+  return CATEGORY_ICON_MAP[key] || Folder;
+};
 
 const gradient = (seed: string) => {
   let h = 0;
@@ -49,7 +59,7 @@ const posterBg = (item: LibraryItem) =>
     : gradient(item.name);
 
 export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) => void }) {
-  const [category, setCategory] = useState<Category>('movies');
+  const [category, setCategory] = useState<Category>('');
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<LibraryItem | null>(null);
@@ -60,8 +70,50 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
   const [sortBy, setSortBy] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [tmdbEditOpen, setTmdbEditOpen] = useState(false);
+  const [categories, setCategories] = useState<CategoryInfo[]>([]);
+  const [mediaRoot, setMediaRoot] = useState('');
+  const [catPickerOpen, setCatPickerOpen] = useState(false);
+  const catBtnRef = useRef<HTMLDivElement | null>(null);
+
+  const loadCategories = async () => {
+    try {
+      const r = await api.get<{
+        root: string;
+        root_exists: boolean;
+        categories: CategoryInfo[];
+      }>('/api/library/categories');
+      setCategories(r.categories);
+      setMediaRoot(r.root);
+      if (!category && r.categories.length) {
+        setCategory(r.categories[0].id);
+      }
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    loadCategories();
+    // Pull W_HIDE_UPLOADED default from settings on mount.
+    api.get<{ config: Record<string, any> }>('/api/settings')
+      .then((s) => {
+        const v = s.config?.W_HIDE_UPLOADED;
+        if (typeof v === 'boolean') setHideUploaded(v);
+      })
+      .catch(() => { /* ignore */ });
+  }, []);
+
+  useEffect(() => {
+    if (!catPickerOpen) return;
+    const close = (e: MouseEvent) => {
+      if (catBtnRef.current && !catBtnRef.current.contains(e.target as Node)) {
+        setCatPickerOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', close);
+    return () => window.removeEventListener('mousedown', close);
+  }, [catPickerOpen]);
 
   const load = async (cat: Category) => {
+    if (!cat) return;
     setLoading(true); setSelected(null);
     try {
       const r = await api.get<{ items: LibraryItem[] }>(`/api/library/${cat}`);
@@ -69,7 +121,10 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(category); }, [category]);
+  useEffect(() => { if (category) load(category); }, [category]);
+
+  const currentCat = categories.find((c) => c.id === category);
+  const currentIcon = currentCat ? iconFor(currentCat.id) : LibraryIcon;
 
   const itemBytes = (it: LibraryItem): number => {
     if (it.seasons && it.seasons.length > 0) {
@@ -143,31 +198,102 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
         background: '#0a0c12', display: 'flex', alignItems: 'center',
         gap: 10, flexShrink: 0, flexWrap: 'wrap',
       }}>
-        <div style={{
-          display: 'flex', gap: 3, background: 'var(--bg-card)',
-          borderRadius: 6, padding: 3, border: '1px solid var(--border)',
-        }}>
-          {CATS.map((c) => {
-            const Icon = c.icon;
-            const active = category === c.id;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setCategory(c.id)}
-                style={{
-                  padding: '6px 12px', borderRadius: 4, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  fontSize: 12, fontWeight: 600,
-                  fontFamily: 'var(--font-display)',
-                  background: active ? 'var(--blue)' : 'transparent',
-                  color: active ? '#fff' : 'var(--fg-2)',
-                  border: 'none',
-                }}
-              >
-                <Icon size={12} />{c.label}
-              </button>
-            );
-          })}
+        <div ref={catBtnRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setCatPickerOpen((v) => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '7px 10px', borderRadius: 6,
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              color: 'var(--fg-1)', fontSize: 12, fontWeight: 600,
+              fontFamily: 'var(--font-display)', cursor: 'pointer',
+              minWidth: 180,
+            }}
+          >
+            {(() => { const I = currentIcon; return <I size={14} color="var(--blue-bright)" />; })()}
+            <span style={{ flex: 1, textAlign: 'left' }}>
+              {currentCat ? currentCat.label : 'Select category'}
+            </span>
+            {currentCat && (
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10,
+                color: 'var(--fg-3)',
+              }}>{currentCat.count}</span>
+            )}
+            <ChevronDown size={13} color="var(--fg-3)"
+              style={{ transition: 'transform 150ms',
+                transform: catPickerOpen ? 'rotate(180deg)' : 'none' }} />
+          </button>
+          {catPickerOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+              minWidth: 260, background: '#0a0c12',
+              border: '1px solid var(--border)', borderRadius: 8,
+              boxShadow: '0 12px 40px rgba(0,0,0,0.55)', zIndex: 50,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                padding: '10px 12px', borderBottom: '1px solid var(--border-subtle)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 10, fontWeight: 700,
+                letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
+                color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
+              }}>
+                <LibraryIcon size={11} /> Library Root
+                <span style={{
+                  marginLeft: 'auto', fontFamily: 'var(--font-mono)',
+                  fontSize: 10, fontWeight: 400, letterSpacing: 0,
+                  textTransform: 'none', color: 'var(--fg-3)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  maxWidth: 160,
+                }} title={mediaRoot}>{mediaRoot || '—'}</span>
+              </div>
+              {categories.length === 0 && (
+                <div style={{
+                  padding: 16, fontSize: 11, color: 'var(--fg-3)',
+                  fontFamily: 'var(--font-display)', textAlign: 'center',
+                }}>No subfolders under the root.</div>
+              )}
+              {categories.map((c) => {
+                const Icon = iconFor(c.id);
+                const active = c.id === category;
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => { setCategory(c.id); setCatPickerOpen(false); }}
+                    style={{
+                      padding: '9px 12px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      background: active ? 'rgba(59,130,246,0.08)' : 'transparent',
+                      borderLeft: active ? '2px solid var(--blue)' : '2px solid transparent',
+                      fontFamily: 'var(--font-display)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    }}
+                  >
+                    <Icon size={13} color={active ? 'var(--blue-bright)' : 'var(--fg-2)'} />
+                    <span style={{
+                      flex: 1, fontSize: 12, fontWeight: 600,
+                      color: active ? 'var(--fg-1)' : 'var(--fg-2)',
+                    }}>{c.label}</span>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10,
+                      color: c.count ? 'var(--fg-3)' : 'var(--fg-4)',
+                    }}>{c.count || 'empty'}</span>
+                  </div>
+                );
+              })}
+              <div style={{
+                padding: '8px 12px', borderTop: '1px solid var(--border-subtle)',
+                fontSize: 10, color: 'var(--fg-4)',
+                fontFamily: 'var(--font-display)',
+              }}>Subfolders of the root are auto-discovered.</div>
+            </div>
+          )}
         </div>
         <input
           value={search}
@@ -677,8 +803,7 @@ function TmdbEditModal({
   onClose: () => void;
   onApplied: () => void;
 }) {
-  const kind = item.kind === 'series' || category === 'series' || category === 'anime'
-    ? 'tv' : 'movie';
+  const kind = item.kind === 'series' ? 'tv' : 'movie';
   const [query, setQuery] = useState(item.tmdb_title_en || item.title || '');
   const [manualId, setManualId] = useState(item.tmdb_id || '');
   const [results, setResults] = useState<TmdbSearchResult[]>([]);

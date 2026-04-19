@@ -1,4 +1,4 @@
-export type Category = 'movies' | 'series' | 'anime';
+export type Category = string;
 export type Kind = 'movie' | 'series' | 'episode';
 
 export interface VideoFile {

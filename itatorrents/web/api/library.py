@@ -22,7 +22,14 @@ from ...core import (
     tmdb_search,
     tmdb_year,
 )
-from ...media import CATEGORIES, MediaItem, Season, get_item, scan_category
+from ...media import (
+    MediaItem,
+    Season,
+    discover_categories,
+    get_item,
+    media_root,
+    scan_category,
+)
 from ..db import list_uploads, record_upload
 from ..lang_cache import get_many_langs, set_lang
 from ..tmdb_cache import get_cache, get_many, set_cache
@@ -162,9 +169,42 @@ async def _enrich_items(items: list[MediaItem]) -> tuple[set[str], dict, dict]:
     return uploaded_paths, cache, lang_cache
 
 
+_CATEGORY_LABELS = {
+    "movies": "Movies",
+    "series": "Series",
+    "anime": "Anime",
+    "documentaries": "Documentaries",
+    "concerts": "Concerts",
+}
+
+
+def _count_entries(path: Path) -> int:
+    try:
+        return sum(1 for _ in path.iterdir() if not _.name.startswith("."))
+    except OSError:
+        return 0
+
+
+@router.get("/library/categories")
+async def library_categories():
+    root = media_root()
+    cats = []
+    for name in discover_categories():
+        cats.append({
+            "id": name,
+            "label": _CATEGORY_LABELS.get(name, name.capitalize()),
+            "count": _count_entries(root / name),
+        })
+    return JSONResponse({
+        "root": str(root),
+        "root_exists": root.exists(),
+        "categories": cats,
+    })
+
+
 @router.get("/library/{category}")
 async def library_list(category: str):
-    if category not in CATEGORIES:
+    if category not in discover_categories():
         raise HTTPException(404, "Category not found")
     items = scan_category(category)
     uploaded_paths, _cache, _lang = await _enrich_items(items)
@@ -176,7 +216,7 @@ async def library_list(category: str):
 
 @router.get("/library/{category}/enrich")
 async def library_enrich(category: str):
-    if category not in CATEGORIES:
+    if category not in discover_categories():
         raise HTTPException(404, "Category not found")
     if not TMDB_API_KEY:
         async def _no_key():
@@ -252,7 +292,7 @@ async def library_enrich(category: str):
 
 @router.get("/library/{category}/scan-langs")
 async def library_scan_langs(category: str):
-    if category not in CATEGORIES:
+    if category not in discover_categories():
         raise HTTPException(404, "Category not found")
 
     async def generate() -> AsyncGenerator[dict, None]:
@@ -338,7 +378,7 @@ class MarkUploadedBody(BaseModel):
 
 @router.post("/library/{category}/{item_name:path}/mark-uploaded")
 async def library_mark_uploaded(category: str, item_name: str, body: MarkUploadedBody):
-    if category not in CATEGORIES:
+    if category not in discover_categories():
         raise HTTPException(404, "Category not found")
     item = get_item(category, item_name)
     if item is None:
@@ -368,7 +408,7 @@ async def library_mark_uploaded(category: str, item_name: str, body: MarkUploade
 
 @router.post("/library/{category}/{item_name:path}/rescan-langs")
 async def library_rescan_langs(category: str, item_name: str):
-    if category not in CATEGORIES:
+    if category not in discover_categories():
         raise HTTPException(404, "Category not found")
     item = get_item(category, item_name)
     if item is None:

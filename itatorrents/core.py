@@ -16,12 +16,28 @@ try:
 except ImportError:
     guessit = None  # type: ignore
 
-SEEDINGS_DIR = Path.home() / "seedings"
+def seedings_dir() -> Path:
+    """Configured hardlink target; env → Unit3Dbot.json → ~/seedings."""
+    try:
+        from .web import config
+        return Path(config.runtime_setting("ITA_SEEDINGS_DIR", default=str(Path.home() / "seedings")))
+    except Exception:
+        return Path(os.environ.get("ITA_SEEDINGS_DIR") or (Path.home() / "seedings"))
+
+
+# Back-compat constant (resolves at import; use seedings_dir() for live-reload).
+SEEDINGS_DIR = seedings_dir()
 VIDEO_EXTENSIONS = {".mkv", ".mp4", ".avi", ".mov", ".m4v", ".ts", ".webm", ".wmv", ".flv"}
 ITA_TAGS = {"it", "ita", "italian", "italiano"}
 TMDB_BASE = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
-TMDB_DEFAULT_LANG = os.environ.get("ITA_TMDB_LANG", "it-IT")
+def tmdb_default_lang() -> str:
+    """Re-evaluate every call so Unit3Dbot.json edits take effect without restart."""
+    try:
+        from .web import config
+        return config.runtime_setting("ITA_TMDB_LANG", default="it-IT")
+    except Exception:
+        return os.environ.get("ITA_TMDB_LANG", "it-IT")
 
 LANG_MAP = {
     "it": "ITA", "ita": "ITA", "italian": "ITA", "italiano": "ITA",
@@ -335,7 +351,7 @@ def map_source(guess: dict) -> tuple[str, str]:
 def tmdb_fetch(kind: str, tmdb_id: str, api_key: str, language: str | None = None) -> dict:
     if not api_key:
         raise RuntimeError("TMDB_API_KEY not set")
-    lang = language or TMDB_DEFAULT_LANG
+    lang = language or tmdb_default_lang()
     url = f"{TMDB_BASE}/{kind}/{urllib.parse.quote(str(tmdb_id))}?api_key={api_key}&language={lang}"
     req = urllib.request.Request(url, headers={"Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=15) as r:
@@ -346,7 +362,7 @@ def tmdb_fetch_bilingual(kind: str, tmdb_id: str, api_key: str) -> dict:
     """Fetch TMDB in primary lang (TMDB_DEFAULT_LANG) and en-US. Returns merged dict with:
       title, original_title, year, poster, overview (primary), overview_en, title_en.
     """
-    data_primary = tmdb_fetch(kind, tmdb_id, api_key, language=TMDB_DEFAULT_LANG)
+    data_primary = tmdb_fetch(kind, tmdb_id, api_key, language=tmdb_default_lang())
     data_en = tmdb_fetch(kind, tmdb_id, api_key, language="en-US")
 
     title = data_primary.get("title") or data_primary.get("name") or ""
@@ -385,7 +401,7 @@ def tmdb_search(kind: str, query: str, year: str, api_key: str, language: str | 
     """Search TMDB. kind='movie'|'tv'. Returns up to 5 normalized results."""
     if not api_key:
         raise RuntimeError("TMDB_API_KEY not set")
-    lang = language or TMDB_DEFAULT_LANG
+    lang = language or tmdb_default_lang()
     params: dict = {"api_key": api_key, "query": query, "language": lang}
     if year:
         if kind == "movie":
