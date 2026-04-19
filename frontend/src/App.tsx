@@ -6,7 +6,6 @@ import { LibraryView } from './views/LibraryView';
 import { QueueView } from './views/QueueView';
 import { UploadedView } from './views/UploadedView';
 import { SearchView } from './views/SearchView';
-import { ReseedView } from './views/ReseedView';
 import { SettingsView } from './views/SettingsView';
 import { LogsView } from './views/LogsView';
 import { LoginView } from './views/LoginView';
@@ -16,17 +15,20 @@ import type { WizardCtx } from './types';
 
 type View =
   | 'queue' | 'library' | 'uploaded' | 'upload'
-  | 'search' | 'reseed' | 'settings' | 'logs';
+  | 'search' | 'settings' | 'logs';
 
+const VALID_VIEWS: View[] = ['queue', 'library', 'uploaded', 'search', 'settings', 'logs'];
 const STORAGE_KEY = 'u3d_view';
 
 export function App() {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [view, setView] = useState<View>(
-    () => (localStorage.getItem(STORAGE_KEY) as View) || 'library',
-  );
+  const [view, setView] = useState<View>(() => {
+    const stored = localStorage.getItem(STORAGE_KEY) as View | null;
+    return stored && VALID_VIEWS.includes(stored) ? stored : 'library';
+  });
   const [showUpload, setShowUpload] = useState(false);
   const [wizardCtx, setWizardCtx] = useState<WizardCtx | null>(null);
+  const [queueFilter, setQueueFilter] = useState('');
 
   useEffect(() => {
     api.get<{ authenticated: boolean }>('/api/me')
@@ -64,13 +66,17 @@ export function App() {
         flex: 1, display: 'flex', flexDirection: 'column',
         overflow: 'hidden', background: 'var(--bg-surface)',
       }}>
-        <TopBar activeView={view} onUploadClick={() => setShowUpload(true)} />
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          {view === 'queue' && <QueueView />}
+        <TopBar
+          activeView={view}
+          onUploadClick={() => setShowUpload(true)}
+          queueFilter={queueFilter}
+          onQueueFilterChange={setQueueFilter}
+        />
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          {view === 'queue' && <QueueView nameFilter={queueFilter} />}
           {view === 'library' && <LibraryView onStartWizard={setWizardCtx} />}
           {view === 'uploaded' && <UploadedView />}
           {view === 'search' && <SearchView />}
-          {view === 'reseed' && <ReseedView />}
           {view === 'settings' && <SettingsView />}
           {view === 'logs' && <LogsView />}
         </div>

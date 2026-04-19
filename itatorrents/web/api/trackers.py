@@ -21,5 +21,10 @@ async def status():
     )
     out = []
     for name, s in zip(names, statuses):
-        out.append({"name": name, "online": bool(s) if not isinstance(s, Exception) else False})
+        trk = trk_map[name]
+        out.append({
+            "name": name,
+            "online": bool(s) if not isinstance(s, Exception) else False,
+            "configured": bool(getattr(trk, "configured", False)),
+        })
     return JSONResponse({"trackers": out})

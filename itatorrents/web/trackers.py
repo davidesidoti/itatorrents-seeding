@@ -87,8 +87,12 @@ class Unit3DTracker(Tracker):
         self.base_url = url.rstrip("/")
         self.api_key = api_key
 
+    @property
+    def configured(self) -> bool:
+        return bool(self.base_url) and bool(self.api_key) and self.api_key not in {"no_key", ""}
+
     async def status(self) -> bool:
-        if not self.base_url:
+        if not self.configured:
             return False
         try:
             async with httpx.AsyncClient(timeout=5.0) as c:
@@ -131,13 +135,18 @@ class Unit3DTracker(Tracker):
 
 
 class _StubTracker(Tracker):
-    def __init__(self, key: str, label: str, url: str):
+    def __init__(self, key: str, label: str, url: str, api_key: str = ""):
         self.key = key
         self.label = label
         self.url = url.rstrip("/")
+        self.api_key = api_key
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.url) and bool(self.api_key) and self.api_key not in {"no_key", ""}
 
     async def status(self) -> bool:
-        if not self.url:
+        if not self.configured:
             return False
         try:
             async with httpx.AsyncClient(timeout=5.0) as c:
@@ -159,10 +168,10 @@ def build_trackers(cfg: dict[str, Any]) -> dict[str, Tracker]:
         ),
         "PTT": _StubTracker(
             "PTT", "Polish Torrent",
-            cfg.get("PTT_URL", ""),
+            cfg.get("PTT_URL", ""), cfg.get("PTT_APIKEY", ""),
         ),
         "SIS": _StubTracker(
             "SIS", "SIS",
-            cfg.get("SIS_URL", ""),
+            cfg.get("SIS_URL", ""), cfg.get("SIS_APIKEY", ""),
         ),
     }

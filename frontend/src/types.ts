@@ -45,7 +45,7 @@ export interface LibraryItem {
   video_files?: VideoFile[];
 }
 
-export interface TrackerStatus { name: string; online: boolean; }
+export interface TrackerStatus { name: string; online: boolean; configured?: boolean; }
 
 export interface UploadedRecord {
   id: number;

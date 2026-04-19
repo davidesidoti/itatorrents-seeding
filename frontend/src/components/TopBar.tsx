@@ -6,7 +6,6 @@ const TITLES: Record<string, string> = {
   library: 'Media Library',
   uploaded: 'Upload History',
   search: 'Search Tracker',
-  reseed: 'Reseed Torrents',
   settings: 'Configuration',
   logs: 'Activity Log',
 };
@@ -14,9 +13,12 @@ const TITLES: Record<string, string> = {
 interface Props {
   activeView: string;
   onUploadClick: () => void;
+  queueFilter: string;
+  onQueueFilterChange: (v: string) => void;
 }
 
-export function TopBar({ activeView, onUploadClick }: Props) {
+export function TopBar({ activeView, onUploadClick, queueFilter, onQueueFilterChange }: Props) {
+  const showQueueFilter = activeView === 'queue';
   return (
     <div style={{
       height: 52, background: '#0a0c12',
@@ -29,26 +31,30 @@ export function TopBar({ activeView, onUploadClick }: Props) {
         fontWeight: 600, color: 'var(--fg-1)',
       }}>{TITLES[activeView] ?? 'Unit3Dup'}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ position: 'relative' }}>
-          <span style={{
-            position: 'absolute', left: 8, top: '50%',
-            transform: 'translateY(-50%)',
-            color: 'var(--fg-3)', pointerEvents: 'none',
-            display: 'flex',
-          }}>
-            <SearchIcon size={13} />
-          </span>
-          <input
-            placeholder="Filter torrents…"
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border)', borderRadius: 6,
-              padding: '5px 10px 5px 30px', fontSize: 12,
-              color: 'var(--fg-2)', width: 200,
-              fontFamily: 'var(--font-display)',
-            }}
-          />
-        </div>
+        {showQueueFilter && (
+          <div style={{ position: 'relative' }}>
+            <span style={{
+              position: 'absolute', left: 8, top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--fg-3)', pointerEvents: 'none',
+              display: 'flex',
+            }}>
+              <SearchIcon size={13} />
+            </span>
+            <input
+              value={queueFilter}
+              onChange={(e) => onQueueFilterChange(e.target.value)}
+              placeholder="Filter torrents…"
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)', borderRadius: 6,
+                padding: '5px 10px 5px 30px', fontSize: 12,
+                color: 'var(--fg-2)', width: 200,
+                fontFamily: 'var(--font-display)',
+              }}
+            />
+          </div>
+        )}
         <button
           onClick={onUploadClick}
           style={{

@@ -12,7 +12,7 @@ function humanSize(b: number): string {
   return `${b} B`;
 }
 
-export function QueueView() {
+export function QueueView({ nameFilter = '' }: { nameFilter?: string }) {
   const [data, setData] = useState<{
     client: string;
     torrents: QueueTorrent[];
@@ -30,9 +30,14 @@ export function QueueView() {
     return () => window.clearInterval(iv);
   }, []);
 
-  const filtered = useMemo(() =>
-    filter === 'all' ? data.torrents : data.torrents.filter((t) => t.state === filter),
-    [data.torrents, filter]);
+  const filtered = useMemo(() => {
+    const q = nameFilter.trim().toLowerCase();
+    return data.torrents.filter((t) => {
+      if (filter !== 'all' && t.state !== filter) return false;
+      if (q && !t.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [data.torrents, filter, nameFilter]);
 
   const counts = {
     total: data.torrents.length,

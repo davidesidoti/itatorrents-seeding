@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  List, Library, CheckCircle, UploadCloud, Search, RefreshCw, Settings, Terminal, LogOut,
+  List, Library, CheckCircle, UploadCloud, Search, Settings, Terminal, LogOut,
 } from 'lucide-react';
 import { api } from '../api';
 import type { TrackerStatus } from '../types';
@@ -11,7 +11,6 @@ const NAV = [
   { id: 'uploaded', icon: CheckCircle,  label: 'Upload History' },
   { id: 'upload',   icon: UploadCloud,  label: 'Quick Upload' },
   { id: 'search',   icon: Search,       label: 'Search' },
-  { id: 'reseed',   icon: RefreshCw,    label: 'Reseed' },
   { id: 'settings', icon: Settings,     label: 'Settings' },
   { id: 'logs',     icon: Terminal,     label: 'Logs' },
 ] as const;
@@ -112,7 +111,7 @@ export function Sidebar({ activeView, setActiveView }: Props) {
           letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
           fontFamily: 'var(--font-display)', marginBottom: 8,
         }}>Trackers</div>
-        {trackers.map((t) => (
+        {trackers.filter((t) => t.configured !== false).map((t) => (
           <div key={t.name} style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             marginBottom: 6,

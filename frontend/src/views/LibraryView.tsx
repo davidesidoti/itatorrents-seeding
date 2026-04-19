@@ -1,8 +1,33 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Film, Tv, Sparkles, RefreshCw, Database, Headphones } from 'lucide-react';
+import {
+  Film, Tv, Sparkles, RefreshCw, Database, Headphones,
+  Pencil, X, Search as SearchIcon, Star,
+} from 'lucide-react';
 import { api, openSSE } from '../api';
 import type { Category, LibraryItem, Season, WizardCtx } from '../types';
 import { LangChip, Badge } from '../components/primitives';
+
+type SortKey = 'name' | 'year' | 'size';
+type SortDir = 'asc' | 'desc';
+
+const sizeToBytes = (s: string): number => {
+  if (!s) return 0;
+  const m = String(s).match(/([\d.]+)\s*(TB|GB|MB|KB|B)/i);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  const u = m[2].toUpperCase();
+  const mult: Record<string, number> = { TB: 1e12, GB: 1e9, MB: 1e6, KB: 1e3, B: 1 };
+  return n * (mult[u] || 1);
+};
+
+interface TmdbSearchResult {
+  id: number | string;
+  title: string;
+  year?: string;
+  overview?: string;
+  poster?: string;
+  vote?: number;
+}
 
 const CATS: { id: Category; label: string; icon: any }[] = [
   { id: 'movies', label: 'Movies', icon: Film },
@@ -32,6 +57,9 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
   const [search, setSearch] = useState('');
   const [enriching, setEnriching] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [sortBy, setSortBy] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [tmdbEditOpen, setTmdbEditOpen] = useState(false);
 
   const load = async (cat: Category) => {
     setLoading(true); setSelected(null);
@@ -43,13 +71,32 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
 
   useEffect(() => { load(category); }, [category]);
 
-  const filtered = useMemo(() => items.filter((it) => {
-    if (search && !it.title.toLowerCase().includes(search.toLowerCase())
-        && !it.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (!hideUploaded) return true;
-    if (it.seasons) return !(it.all_seasons_uploaded);
-    return !it.already_uploaded;
-  }), [items, search, hideUploaded]);
+  const itemBytes = (it: LibraryItem): number => {
+    if (it.seasons && it.seasons.length > 0) {
+      return it.seasons.reduce((a, s) => a + sizeToBytes(s.size), 0);
+    }
+    return sizeToBytes(it.size);
+  };
+
+  const filtered = useMemo(() => {
+    const base = items.filter((it) => {
+      if (search && !it.title.toLowerCase().includes(search.toLowerCase())
+          && !it.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (!hideUploaded) return true;
+      if (it.seasons) return !(it.all_seasons_uploaded);
+      return !it.already_uploaded;
+    });
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return base.slice().sort((a, b) => {
+      if (sortBy === 'year') {
+        return ((parseInt(a.year || '0', 10) || 0) - (parseInt(b.year || '0', 10) || 0)) * dir;
+      }
+      if (sortBy === 'size') {
+        return (itemBytes(a) - itemBytes(b)) * dir;
+      }
+      return a.title.localeCompare(b.title) * dir;
+    });
+  }, [items, search, hideUploaded, sortBy, sortDir]);
 
   const needTmdb = filtered.filter((i) => !i.tmdb_id).length;
   const needLangs = filtered.filter((i) => !i.lang_scanned).length;
@@ -179,10 +226,48 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
         {needLangs > 0 && (
           <span style={warnChip}>⚠ {needLangs} need lang scan</span>
         )}
-        <span style={{
-          marginLeft: 'auto', fontSize: 11, color: 'var(--fg-3)',
-          fontFamily: 'var(--font-display)',
-        }}>{filtered.length} of {items.length} titles</span>
+        <div style={{
+          marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <span style={{
+            fontSize: 10, fontWeight: 700,
+            letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
+            color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
+          }}>Sort</span>
+          <div style={{
+            display: 'flex', gap: 2, background: 'var(--bg-card)',
+            border: '1px solid var(--border)', borderRadius: 6, padding: 2,
+          }}>
+            {([['name', 'Name'], ['year', 'Year'], ['size', 'Size']] as const).map(([k, l]) => (
+              <button
+                key={k}
+                onClick={() => setSortBy(k)}
+                style={{
+                  padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
+                  fontSize: 11, fontWeight: 600,
+                  fontFamily: 'var(--font-display)',
+                  background: sortBy === k ? 'var(--blue)' : 'transparent',
+                  color: sortBy === k ? '#fff' : 'var(--fg-3)',
+                }}
+              >{l}</button>
+            ))}
+          </div>
+          <button
+            onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
+            title={`Sort ${sortDir === 'asc' ? 'ascending' : 'descending'}`}
+            style={{
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+              color: 'var(--fg-3)', fontFamily: 'var(--font-mono)',
+              fontSize: 11, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 3,
+            }}
+          >{sortDir === 'asc' ? '↑ A→Z' : '↓ Z→A'}</button>
+          <span style={{
+            fontSize: 11, color: 'var(--fg-3)',
+            fontFamily: 'var(--font-display)', marginLeft: 4,
+          }}>{filtered.length} of {items.length}</span>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -289,20 +374,30 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
             category={category}
             onStart={startWizard}
             onClose={() => setSelected(null)}
+            onEditTmdb={() => setTmdbEditOpen(true)}
           />
         )}
       </div>
+      {tmdbEditOpen && selected && (
+        <TmdbEditModal
+          item={selected}
+          category={category}
+          onClose={() => setTmdbEditOpen(false)}
+          onApplied={() => { setTmdbEditOpen(false); load(category); }}
+        />
+      )}
     </div>
   );
 }
 
 function DetailPanel({
-  item, category, onStart,
+  item, category, onStart, onEditTmdb,
 }: {
   item: LibraryItem;
   category: Category;
   onStart: (kind: 'movie' | 'series' | 'episode', path: string, season?: Season) => void;
   onClose: () => void;
+  onEditTmdb: () => void;
 }) {
   return (
     <div style={{
@@ -338,10 +433,20 @@ function DetailPanel({
             {item.tmdb_id || 'not matched'}
           </span>
           <span style={{
-            marginLeft: 'auto',
             color: item.tmdb_id ? 'var(--green)' : 'var(--yellow)',
             fontWeight: 600,
           }}>{item.tmdb_id ? '✓' : 'manual'}</span>
+          <button
+            onClick={onEditTmdb}
+            style={{
+              marginLeft: 'auto', background: 'var(--bg-base)',
+              border: '1px solid var(--border)', borderRadius: 4,
+              padding: '3px 8px', fontSize: 10, fontWeight: 600,
+              color: 'var(--fg-3)', cursor: 'pointer',
+              fontFamily: 'var(--font-display)',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}
+          ><Pencil size={9} /> Edit</button>
         </div>
         {item.tmdb_overview && (
           <div style={{
@@ -563,3 +668,268 @@ const warnChip: React.CSSProperties = {
   background: 'rgba(245,166,35,0.1)', color: 'var(--yellow)',
   border: '1px solid var(--yellow)', fontFamily: 'var(--font-display)',
 };
+
+function TmdbEditModal({
+  item, category, onClose, onApplied,
+}: {
+  item: LibraryItem;
+  category: Category;
+  onClose: () => void;
+  onApplied: () => void;
+}) {
+  const kind = item.kind === 'series' || category === 'series' || category === 'anime'
+    ? 'tv' : 'movie';
+  const [query, setQuery] = useState(item.tmdb_title_en || item.title || '');
+  const [manualId, setManualId] = useState(item.tmdb_id || '');
+  const [results, setResults] = useState<TmdbSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const runSearch = async (q: string) => {
+    setQuery(q);
+    if (!q.trim()) { setResults([]); return; }
+    setSearching(true); setError(null);
+    try {
+      const year = item.year || '';
+      const r = await api.get<{ results: TmdbSearchResult[] }>(
+        `/api/tmdb/search?q=${encodeURIComponent(q)}&year=${encodeURIComponent(year)}&kind=${kind}`,
+      );
+      setResults(r.results || []);
+    } catch (e: any) {
+      setError(e?.message || 'search failed');
+      setResults([]);
+    } finally { setSearching(false); }
+  };
+
+  useEffect(() => { runSearch(query); }, []);
+
+  const apply = async (id: string | number) => {
+    setApplying(true); setError(null);
+    try {
+      await api.post('/api/tmdb/set', {
+        source_path: item.path,
+        tmdb_id: String(id),
+        tmdb_kind: kind,
+      });
+      onApplied();
+    } catch (e: any) {
+      setError(e?.message || 'apply failed');
+    } finally { setApplying(false); }
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)',
+        backdropFilter: 'blur(2px)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 560, maxHeight: '80vh', background: '#0a0c12',
+          border: '1px solid var(--border)', borderRadius: 8,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}
+      >
+        <div style={{
+          padding: '14px 18px', borderBottom: '1px solid var(--border-subtle)',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <Database size={14} color="var(--blue)" />
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontFamily: 'var(--font-display)', fontSize: 14,
+              fontWeight: 700, color: 'var(--fg-1)',
+            }}>Edit TMDB Match</div>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 10,
+              color: 'var(--fg-3)', marginTop: 2,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>{item.name}</div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent', border: 'none',
+              color: 'var(--fg-3)', cursor: 'pointer',
+              padding: 4, display: 'flex',
+            }}
+          ><X size={16} /></button>
+        </div>
+
+        <div style={{
+          padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)',
+        }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700,
+            letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
+            color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
+            marginBottom: 6,
+          }}>Search TMDB ({kind})</div>
+          <div style={{ position: 'relative' }}>
+            <SearchIcon
+              size={13}
+              style={{
+                position: 'absolute', left: 10, top: '50%',
+                transform: 'translateY(-50%)', color: 'var(--fg-3)',
+              }}
+            />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => runSearch(e.target.value)}
+              placeholder="Search by title…"
+              style={{
+                width: '100%', background: 'var(--bg-card)',
+                border: '1px solid var(--border)', borderRadius: 6,
+                padding: '8px 10px 8px 30px', fontSize: 12,
+                color: 'var(--fg-1)', fontFamily: 'var(--font-mono)',
+                outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+        </div>
+
+        <div style={{
+          flex: 1, overflowY: 'auto', padding: '8px 10px', minHeight: 200,
+        }}>
+          {error && (
+            <div style={{
+              padding: 12, margin: 6, borderRadius: 6,
+              background: 'var(--red-dim)', color: 'var(--red)',
+              fontSize: 11, fontFamily: 'var(--font-mono)',
+            }}>{error}</div>
+          )}
+          {searching ? (
+            <div style={{
+              padding: 24, textAlign: 'center', fontSize: 11,
+              color: 'var(--fg-3)', fontFamily: 'var(--font-mono)',
+            }}>Searching TMDB…</div>
+          ) : results.length === 0 ? (
+            <div style={{
+              padding: 24, textAlign: 'center', fontSize: 11,
+              color: 'var(--fg-3)', fontFamily: 'var(--font-display)',
+            }}>No results — try a different title or paste an ID below.</div>
+          ) : results.map((r) => {
+            const isCurrent = String(r.id) === String(item.tmdb_id);
+            return (
+              <div
+                key={r.id}
+                onClick={() => !applying && apply(r.id)}
+                style={{
+                  display: 'flex', gap: 10, padding: 8, borderRadius: 6,
+                  cursor: applying ? 'wait' : 'pointer', marginBottom: 4,
+                  border: isCurrent ? '1px solid var(--blue)' : '1px solid transparent',
+                  background: isCurrent ? 'rgba(59,130,246,0.08)' : 'transparent',
+                  opacity: applying ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!isCurrent) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                }}
+              >
+                <div style={{
+                  width: 42, height: 62, borderRadius: 4, flexShrink: 0,
+                  background: r.poster
+                    ? `url("${r.poster}") center/cover`
+                    : 'linear-gradient(135deg, var(--bg-card), var(--bg-base))',
+                }}/>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <div style={{
+                      fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600,
+                      color: 'var(--fg-1)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{r.title}</div>
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)',
+                    }}>{r.year}</div>
+                    {isCurrent && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, padding: '1px 5px',
+                        borderRadius: 3, background: 'var(--green-dim)',
+                        color: 'var(--green)',
+                        fontFamily: 'var(--font-display)',
+                      }}>CURRENT</span>
+                    )}
+                  </div>
+                  {r.overview && (
+                    <div style={{
+                      fontFamily: 'var(--font-display)', fontSize: 11,
+                      color: 'var(--fg-2)', lineHeight: 1.4, marginTop: 3,
+                      display: '-webkit-box', WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                    }}>{r.overview}</div>
+                  )}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10, marginTop: 4,
+                    fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)',
+                  }}>
+                    <span>id: <span style={{ color: 'var(--blue-bright)' }}>{r.id}</span></span>
+                    {typeof r.vote === 'number' && r.vote > 0 && (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Star size={9} color="var(--yellow)" />
+                        <span style={{ color: 'var(--yellow)' }}>{r.vote.toFixed(1)}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{
+          padding: '12px 18px', borderTop: '1px solid var(--border-subtle)',
+          background: 'var(--bg-base)',
+        }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700,
+            letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
+            color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
+            marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            Or paste TMDB ID manually
+            <span style={{
+              color: 'var(--fg-3)', fontWeight: 400,
+              letterSpacing: 0, textTransform: 'none',
+            }}>e.g. from themoviedb.org URL</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              value={manualId}
+              onChange={(e) => setManualId(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="123456"
+              style={{
+                flex: 1, background: 'var(--bg-card)',
+                border: '1px solid var(--border)', borderRadius: 6,
+                padding: '8px 10px', fontSize: 12, color: 'var(--fg-1)',
+                fontFamily: 'var(--font-mono)',
+                outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <button
+              onClick={() => manualId && apply(manualId)}
+              disabled={!manualId || applying}
+              style={{
+                background: manualId && !applying ? 'var(--blue)' : 'var(--bg-card)',
+                border: 'none', borderRadius: 6, padding: '0 16px',
+                fontSize: 11, fontWeight: 600,
+                color: manualId && !applying ? '#fff' : 'var(--fg-4)',
+                cursor: manualId && !applying ? 'pointer' : 'not-allowed',
+                fontFamily: 'var(--font-display)',
+              }}
+            >{applying ? 'Applying…' : 'Apply ID'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
