@@ -1,4 +1,4 @@
-import { Search as SearchIcon, UploadCloud } from 'lucide-react';
+import { Menu, Search as SearchIcon, UploadCloud } from 'lucide-react';
 
 const TITLES: Record<string, string> = {
   queue: 'Upload Queue',
@@ -15,21 +15,40 @@ interface Props {
   onUploadClick: () => void;
   queueFilter: string;
   onQueueFilterChange: (v: string) => void;
+  isMobile?: boolean;
+  onMenuClick?: () => void;
 }
 
-export function TopBar({ activeView, onUploadClick, queueFilter, onQueueFilterChange }: Props) {
-  const showQueueFilter = activeView === 'queue';
+export function TopBar({
+  activeView, onUploadClick, queueFilter, onQueueFilterChange, isMobile, onMenuClick,
+}: Props) {
+  const showQueueFilter = activeView === 'queue' && !isMobile;
   return (
     <div style={{
       height: 52, background: '#0a0c12',
       borderBottom: '1px solid var(--border-subtle)',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 24px', flexShrink: 0,
+      padding: isMobile ? '0 12px' : '0 24px', flexShrink: 0, gap: 10,
     }}>
-      <div style={{
-        fontFamily: 'var(--font-display)', fontSize: 15,
-        fontWeight: 600, color: 'var(--fg-1)',
-      }}>{TITLES[activeView] ?? 'Unit3Dup'}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        {isMobile && (
+          <button
+            onClick={onMenuClick}
+            aria-label="Open menu"
+            style={{
+              background: 'transparent', border: '1px solid var(--border)',
+              borderRadius: 6, color: 'var(--fg-2)', cursor: 'pointer',
+              padding: '7px 9px', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}
+          ><Menu size={16} /></button>
+        )}
+        <div style={{
+          fontFamily: 'var(--font-display)', fontSize: 15,
+          fontWeight: 600, color: 'var(--fg-1)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{TITLES[activeView] ?? 'Unit3Dup'}</div>
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         {showQueueFilter && (
           <div style={{ position: 'relative' }}>
@@ -68,7 +87,7 @@ export function TopBar({ activeView, onUploadClick, queueFilter, onQueueFilterCh
           onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--blue-bright)')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--blue)')}
         >
-          <UploadCloud size={13} /> Upload
+          <UploadCloud size={13} />{!isMobile && 'Upload'}
         </button>
       </div>
     </div>

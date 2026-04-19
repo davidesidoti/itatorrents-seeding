@@ -96,9 +96,11 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        className="u3d-mobile-modal"
         style={{
           background: 'var(--bg-surface)', border: '1px solid var(--border)',
-          borderRadius: 8, width: 560, maxHeight: '90vh',
+          borderRadius: 8, width: 560,
+          maxWidth: 'calc(100vw - 24px)', maxHeight: '90vh',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >

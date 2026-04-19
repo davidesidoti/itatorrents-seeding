@@ -58,7 +58,7 @@ const posterBg = (item: LibraryItem) =>
     ? `linear-gradient(160deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.75) 100%), url("${item.tmdb_poster}") center/cover`
     : gradient(item.name);
 
-export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) => void }) {
+export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: WizardCtx) => void; isMobile?: boolean }) {
   const [category, setCategory] = useState<Category>('');
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -194,7 +194,8 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{
-        padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)',
+        padding: isMobile ? '10px 14px' : '12px 18px',
+        borderBottom: '1px solid var(--border-subtle)',
         background: '#0a0c12', display: 'flex', alignItems: 'center',
         gap: 10, flexShrink: 0, flexWrap: 'wrap',
       }}>
@@ -325,9 +326,10 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
       </div>
 
       <div style={{
-        padding: '8px 18px', display: 'flex', alignItems: 'center', gap: 12,
+        padding: isMobile ? '8px 14px' : '8px 18px',
+        display: 'flex', alignItems: 'center', gap: 12,
         borderBottom: '1px solid var(--border-subtle)',
-        background: '#0a0c12', flexShrink: 0,
+        background: '#0a0c12', flexShrink: 0, flexWrap: 'wrap',
       }}>
         <div
           style={{
@@ -399,9 +401,13 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{
           flex: 1, display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+          gridTemplateColumns: isMobile
+            ? 'repeat(auto-fill, minmax(110px, 1fr))'
+            : 'repeat(auto-fill, minmax(150px, 1fr))',
           gridAutoRows: 'min-content',
-          gap: 10, padding: '14px 18px', overflowY: 'auto', alignContent: 'start',
+          gap: isMobile ? 8 : 10,
+          padding: isMobile ? '12px 14px' : '14px 18px',
+          overflowY: 'auto', alignContent: 'start',
         }}>
           {filtered.map((item) => {
             const isSeries = !!item.seasons;
@@ -501,6 +507,7 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
             onStart={startWizard}
             onClose={() => setSelected(null)}
             onEditTmdb={() => setTmdbEditOpen(true)}
+            isMobile={isMobile}
           />
         )}
       </div>
@@ -517,20 +524,45 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
 }
 
 function DetailPanel({
-  item, category, onStart, onEditTmdb,
+  item, category, onStart, onClose, onEditTmdb, isMobile,
 }: {
   item: LibraryItem;
   category: Category;
   onStart: (kind: 'movie' | 'series' | 'episode', path: string, season?: Season) => void;
   onClose: () => void;
   onEditTmdb: () => void;
+  isMobile?: boolean;
 }) {
+  const mobileOverlayStyle = isMobile
+    ? {
+        position: 'fixed' as const, inset: 0, zIndex: 100,
+        background: '#0a0c12', width: 'auto', borderLeft: 'none',
+      }
+    : { width: 360, borderLeft: '1px solid var(--border-subtle)' };
   return (
     <div style={{
-      width: 360, borderLeft: '1px solid var(--border-subtle)',
       display: 'flex', flexDirection: 'column', background: '#0a0c12',
       overflowY: 'auto', flexShrink: 0,
+      ...mobileOverlayStyle,
     }}>
+      {isMobile && (
+        <button
+          onClick={onClose}
+          style={{
+            position: 'sticky', top: 0, zIndex: 2,
+            alignSelf: 'flex-start', margin: 10,
+            background: 'rgba(10,12,18,0.85)',
+            backdropFilter: 'blur(6px)',
+            border: '1px solid var(--border)', borderRadius: 6,
+            padding: '6px 10px', color: 'var(--fg-1)', cursor: 'pointer',
+            fontSize: 12, fontWeight: 600,
+            fontFamily: 'var(--font-display)',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          <X size={14} /> Back to library
+        </button>
+      )}
       <div style={{
         height: 200, background: posterBg(item),
         display: 'flex', alignItems: 'flex-end', padding: 14, flexShrink: 0,

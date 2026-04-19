@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  List, Library, CheckCircle, UploadCloud, Search, Settings, Terminal, LogOut,
+  List, Library, CheckCircle, UploadCloud, Search, Settings, Terminal, LogOut, X,
 } from 'lucide-react';
 import { api } from '../api';
 import type { TrackerStatus } from '../types';
@@ -18,9 +18,12 @@ const NAV = [
 interface Props {
   activeView: string;
   setActiveView: (v: any) => void;
+  isMobile?: boolean;
+  drawerOpen?: boolean;
+  onCloseDrawer?: () => void;
 }
 
-export function Sidebar({ activeView, setActiveView }: Props) {
+export function Sidebar({ activeView, setActiveView, isMobile, drawerOpen, onCloseDrawer }: Props) {
   const [trackers, setTrackers] = useState<TrackerStatus[]>([
     { name: 'ITT', online: false },
     { name: 'PTT', online: false },
@@ -46,23 +49,60 @@ export function Sidebar({ activeView, setActiveView }: Props) {
     }
   };
 
+  const sidebarMobile = isMobile
+    ? {
+        position: 'fixed' as const, top: 0, left: 0, bottom: 0, zIndex: 201,
+        transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 200ms ease',
+        boxShadow: drawerOpen ? '0 0 40px rgba(0,0,0,0.7)' : 'none',
+      }
+    : {};
+
   return (
+    <>
+    {isMobile && drawerOpen && (
+      <div
+        onClick={onCloseDrawer}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.5)',
+          animation: 'u3d-fade-in 180ms ease',
+        }}
+      />
+    )}
     <div style={{
       width: 220, minHeight: '100vh', background: '#07080b',
       borderRight: '1px solid var(--border-subtle)',
       display: 'flex', flexDirection: 'column', flexShrink: 0,
+      ...sidebarMobile,
     }}>
-      <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
-        <div style={{
-          fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700,
-          color: 'var(--fg-1)', letterSpacing: 'var(--tracking-tight)',
-        }}>
-          Unit3<span style={{ color: 'var(--blue)' }}>Dup</span>
+      <div style={{
+        padding: '20px 18px 16px', borderBottom: '1px solid var(--border-subtle)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700,
+            color: 'var(--fg-1)', letterSpacing: 'var(--tracking-tight)',
+          }}>
+            Unit3<span style={{ color: 'var(--blue)' }}>Dup</span>
+          </div>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10,
+            color: 'var(--fg-3)', marginTop: 2,
+          }}>v0.2.0</div>
         </div>
-        <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10,
-          color: 'var(--fg-3)', marginTop: 2,
-        }}>v0.2.0</div>
+        {isMobile && (
+          <button
+            onClick={onCloseDrawer}
+            aria-label="Close menu"
+            style={{
+              background: 'transparent', border: 'none', color: 'var(--fg-3)',
+              cursor: 'pointer', padding: 6, display: 'flex',
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          ><X size={18} /></button>
+        )}
       </div>
 
       <nav style={{ padding: '12px 8px', flex: 1 }}>
@@ -154,5 +194,6 @@ export function Sidebar({ activeView, setActiveView }: Props) {
         ><LogOut size={12} /> Logout</button>
       </div>
     </div>
+    </>
   );
 }

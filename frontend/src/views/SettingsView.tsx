@@ -34,7 +34,7 @@ type SettingsResponse = {
   config_path: string;
 };
 
-export function SettingsView() {
+export function SettingsView({ isMobile }: { isMobile?: boolean } = {}) {
   const [section, setSection] = useState<Section>('tracker');
   const [data, setData] = useState<SettingsResponse | null>(null);
   const [saved, setSaved] = useState(false);
@@ -61,13 +61,25 @@ export function SettingsView() {
     } finally { setSaving(false); }
   };
 
+  const navStyle = isMobile
+    ? {
+        display: 'flex', gap: 4, padding: '8px 10px',
+        borderBottom: '1px solid var(--border-subtle)',
+        overflowX: 'auto' as const, overflowY: 'hidden' as const,
+        flexShrink: 0, WebkitOverflowScrolling: 'touch' as const,
+      }
+    : {
+        width: 160, borderRight: '1px solid var(--border-subtle)',
+        padding: '10px 6px', flexShrink: 0,
+      };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div style={{
-          width: 160, borderRight: '1px solid var(--border-subtle)',
-          padding: '10px 6px', flexShrink: 0,
-        }}>
+      <div style={{
+        display: 'flex', flex: 1, overflow: 'hidden',
+        flexDirection: isMobile ? 'column' : 'row',
+      }}>
+        <div style={navStyle}>
           {SECTIONS.map((s) => {
             const Icon = s.icon;
             const active = section === s.id;
@@ -77,7 +89,9 @@ export function SettingsView() {
                 onClick={() => setSection(s.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '6px 10px', borderRadius: 6, marginBottom: 2,
+                  padding: '6px 10px', borderRadius: 6,
+                  marginBottom: isMobile ? 0 : 2,
+                  flexShrink: 0, whiteSpace: 'nowrap',
                   cursor: 'pointer',
                   background: active ? 'var(--blue-muted)' : 'transparent',
                   color: active ? 'var(--blue-bright)' : 'var(--fg-3)',
@@ -94,13 +108,17 @@ export function SettingsView() {
           })}
         </div>
 
-        <div style={{ flex: 1, padding: '18px 20px', overflowY: 'auto' }}>
-          {section === 'tracker' && <TrackerSection cfg={cfg} set={set} />}
-          {section === 'client' && <ClientSection cfg={cfg} set={set} />}
+        <div style={{
+          flex: 1, minWidth: 0,
+          padding: isMobile ? '14px' : '18px 20px',
+          overflowY: 'auto',
+        }}>
+          {section === 'tracker' && <TrackerSection cfg={cfg} set={set} isMobile={isMobile} />}
+          {section === 'client' && <ClientSection cfg={cfg} set={set} isMobile={isMobile} />}
           {section === 'prefs' && <PrefsSection cfg={cfg} set={set} />}
           {section === 'imghost' && <ImageHostsSection cfg={cfg} set={set} />}
-          {section === 'paths' && <PathsSection cfg={cfg} set={set} />}
-          {section === 'seeding' && <SeedingSection cfg={cfg} set={set} env={data.env} />}
+          {section === 'paths' && <PathsSection cfg={cfg} set={set} isMobile={isMobile} />}
+          {section === 'seeding' && <SeedingSection cfg={cfg} set={set} env={data.env} isMobile={isMobile} />}
           {section === 'console' && <ConsoleSection cfg={cfg} set={set} />}
         </div>
       </div>
@@ -195,9 +213,9 @@ function ToggleRow({
 
 // -------------------------------------------------------------- Sections ----
 
-function TrackerSection({ cfg, set }: { cfg: Cfg; set: SetFn }) {
+function TrackerSection({ cfg, set, isMobile }: { cfg: Cfg; set: SetFn; isMobile?: boolean }) {
   const grid2: React.CSSProperties = {
-    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10,
+    display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10,
   };
   return (
     <>
@@ -284,9 +302,9 @@ function MultiTrackerRow({ cfg, set }: { cfg: Cfg; set: SetFn }) {
   );
 }
 
-function ClientSection({ cfg, set }: { cfg: Cfg; set: SetFn }) {
+function ClientSection({ cfg, set, isMobile }: { cfg: Cfg; set: SetFn; isMobile?: boolean }) {
   const grid2: React.CSSProperties = {
-    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10,
+    display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10,
   };
   return (
     <>
@@ -519,9 +537,9 @@ function ImageHostsSection({ cfg, set }: { cfg: Cfg; set: SetFn }) {
   );
 }
 
-function PathsSection({ cfg, set }: { cfg: Cfg; set: SetFn }) {
+function PathsSection({ cfg, set, isMobile }: { cfg: Cfg; set: SetFn; isMobile?: boolean }) {
   const grid2: React.CSSProperties = {
-    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10,
+    display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 10, marginBottom: 10,
   };
   return (
     <>
@@ -567,8 +585,9 @@ type Categories = {
 };
 
 function SeedingSection({
-  cfg, set, env,
-}: { cfg: Cfg; set: SetFn; env: Record<string, string> }) {
+  cfg, set, env, isMobile,
+}: { cfg: Cfg; set: SetFn; env: Record<string, string>; isMobile?: boolean }) {
+  const twoCols = isMobile ? '1fr' : '1fr 1fr';
   const [fsCheck, setFsCheck] = useState<FsCheck | null>(null);
   const [cats, setCats] = useState<Categories | null>(null);
 
@@ -652,11 +671,11 @@ function SeedingSection({
         Host, port, proxy prefix and TLS toggle are read at startup. Save here, then restart
         the service for changes to take effect.
       </p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: twoCols, gap: 10 }}>
         <Field cfg={cfg} set={set} k="ITA_HOST" label="ITA_HOST" />
         <Field cfg={cfg} set={set} k="ITA_PORT" label="ITA_PORT" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: twoCols, gap: 10, marginTop: 10 }}>
         <Field cfg={cfg} set={set} k="ITA_ROOT_PATH" label="ITA_ROOT_PATH (nginx prefix)" />
         <Field cfg={cfg} set={set} k="ITA_TMDB_LANG" label="ITA_TMDB_LANG" />
       </div>

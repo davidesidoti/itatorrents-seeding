@@ -29,6 +29,14 @@ export function App() {
   const [showUpload, setShowUpload] = useState(false);
   const [wizardCtx, setWizardCtx] = useState<WizardCtx | null>(null);
   const [queueFilter, setQueueFilter] = useState('');
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     api.get<{ authenticated: boolean }>('/api/me')
@@ -55,29 +63,38 @@ export function App() {
   if (!authed) return <LoginView onLoggedIn={() => setAuthed(true)} />;
 
   const handleSetView = (v: View) => {
+    setDrawerOpen(false);
     if (v === 'upload') { setShowUpload(true); return; }
     setView(v);
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <Sidebar activeView={view} setActiveView={handleSetView} />
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+      <Sidebar
+        activeView={view}
+        setActiveView={handleSetView}
+        isMobile={isMobile}
+        drawerOpen={drawerOpen}
+        onCloseDrawer={() => setDrawerOpen(false)}
+      />
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column',
-        overflow: 'hidden', background: 'var(--bg-surface)',
+        overflow: 'hidden', background: 'var(--bg-surface)', minWidth: 0,
       }}>
         <TopBar
           activeView={view}
           onUploadClick={() => setShowUpload(true)}
           queueFilter={queueFilter}
           onQueueFilterChange={setQueueFilter}
+          isMobile={isMobile}
+          onMenuClick={() => setDrawerOpen(true)}
         />
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           {view === 'queue' && <QueueView nameFilter={queueFilter} />}
-          {view === 'library' && <LibraryView onStartWizard={setWizardCtx} />}
+          {view === 'library' && <LibraryView onStartWizard={setWizardCtx} isMobile={isMobile} />}
           {view === 'uploaded' && <UploadedView />}
           {view === 'search' && <SearchView />}
-          {view === 'settings' && <SettingsView />}
+          {view === 'settings' && <SettingsView isMobile={isMobile} />}
           {view === 'logs' && <LogsView />}
         </div>
       </div>
