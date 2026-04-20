@@ -23,6 +23,8 @@ First screen: password field. Credentials are validated against `ITA_PASSWORD_HA
 
 ## Media Library
 
+![Media Library with TMDB posters, audio language badges and detail panel](assets/screenshots/media_library.png)
+
 Lists categories (subfolders of `ITA_MEDIA_ROOT`) and items inside them.
 
 Features:
@@ -41,6 +43,8 @@ Relevant endpoints: `GET /api/library/categories`, `GET /api/library/{category}`
 ---
 
 ## Upload Wizard
+
+![Upload Wizard — TMDB step with title preview and metadata](assets/screenshots/upload_wizard.png)
 
 Step-by-step flow. Alternative to the CLI with more options and persistent history.
 
@@ -61,6 +65,8 @@ Typical steps:
 ---
 
 ## Upload Queue
+
+![Upload Queue — qBittorrent queue with progress bars and seeding status](assets/screenshots/queue.png)
 
 Shows active torrents in the configured client (`TORRENT_CLIENT` in `Unit3Dbot.json`: `qbittorrent`, `transmission`, `rtorrent`).
 
@@ -92,6 +98,8 @@ On mobile the table uses `overflow-x:auto` with `min-width:820px` to stay readab
 
 ## Search Tracker
 
+![Search Tracker — ITT results with type/resolution tags and seeder counts](assets/screenshots/search.png)
+
 Searches for a torrent on ITT (always) and on PTT/SIS (if configured in `Unit3Dbot.json` with valid URL + API key).
 
 - Tab per tracker.
@@ -106,6 +114,8 @@ Endpoint: `GET /api/trackers` (status) + `GET /api/search?q=...`.
 ---
 
 ## Settings
+
+![Settings — Preferences panel with upload behaviour toggles and screenshot options](assets/screenshots/settings.png)
 
 Full `Unit3Dbot.json` editor right in the browser.
 

@@ -1,7 +1,17 @@
 # itatorrents-seeding
 
+![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
+![FastAPI](https://img.shields.io/badge/fastapi-109989?style=for-the-badge&logo=FASTAPI&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
+![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?style=for-the-badge&logo=github%20Pages&logoColor=white)
+
 Web UI + CLI per preparare e automatizzare upload su [ItaTorrents.xyz](https://itatorrents.xyz).
 Verifica tracce audio italiane, rinomina secondo la nomenclatura ItaTorrents, crea hardlink in `~/seedings/` e lancia `unit3dup` per l'upload.
+
+![Media Library](docs/assets/screenshots/media_library.png)
 
 **Documentazione completa → <https://davidesidoti.github.io/itatorrents-seeding/>**
 
