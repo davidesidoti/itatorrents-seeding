@@ -1,0 +1,118 @@
+site_name: itatorrents-seeding
+site_description: Web UI + CLI per pre-flight upload su ItaTorrents.xyz
+site_url: https://davidesidoti.github.io/itatorrents-seeding/
+repo_url: https://github.com/davidesidoti/itatorrents-seeding
+repo_name: davidesidoti/itatorrents-seeding
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: it
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Tema scuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Tema chiaro
+  features:
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+    - content.action.edit
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.emoji
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: it
+          default: true
+          name: Italiano
+          build: true
+          nav_translations:
+            Home: Home
+            Installazione: Installazione
+            Configurazione: Configurazione
+            Uso: Uso
+            CLI: CLI
+            Web UI: Web UI
+            Deploy: Deploy
+            VPS (sudo/Docker): VPS (sudo/Docker)
+            Ultra.cc: Ultra.cc
+            Nomenclatura: Nomenclatura
+            Troubleshooting: Troubleshooting
+        - locale: en
+          name: English
+          build: true
+          site_name: itatorrents-seeding
+          nav_translations:
+            Home: Home
+            Installazione: Installation
+            Configurazione: Configuration
+            Uso: Usage
+            CLI: CLI
+            Web UI: Web UI
+            Deploy: Deploy
+            VPS (sudo/Docker): VPS (sudo/Docker)
+            Ultra.cc: Ultra.cc
+            Nomenclatura: Naming convention
+            Troubleshooting: Troubleshooting
+
+nav:
+  - Home: index.md
+  - Installazione: installazione.md
+  - Configurazione: configurazione.md
+  - Uso:
+      - CLI: uso-cli.md
+      - Web UI: uso-web.md
+  - Deploy:
+      - VPS (sudo/Docker): deploy-vps.md
+      - Ultra.cc: deploy-ultracc.md
+  - Nomenclatura: nomenclatura.md
+  - Troubleshooting: troubleshooting.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/davidesidoti/itatorrents-seeding
