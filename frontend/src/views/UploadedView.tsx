@@ -43,7 +43,11 @@ export function UploadedView() {
       padding: '18px 22px', display: 'flex', flexDirection: 'column',
       gap: 14, height: '100%', minHeight: 0, overflow: 'auto',
     }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+        gap: 10,
+      }}>
         <StatCard value={stats.total} label="Total uploads" />
         <StatCard value={stats.success} label="Successful" color="var(--green)" />
         <StatCard value={stats.failed} label="Failed" color="var(--red)" />
@@ -80,9 +84,13 @@ export function UploadedView() {
 
       <div style={{
         background: '#0a0c12', border: '1px solid var(--border-subtle)',
-        borderRadius: 8, overflow: 'hidden',
+        borderRadius: 8, overflowX: 'auto', overflowY: 'auto',
       }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 90px 180px 100px 140px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '80px minmax(240px, 1fr) 90px 180px 100px 140px',
+          minWidth: 820,
+        }}>
           {['Kind', 'Title / Final Name', 'TMDB', 'Uploaded', 'Status', 'Actions'].map((h) => (
             <div key={h} style={th}>{h}</div>
           ))}
@@ -96,7 +104,8 @@ export function UploadedView() {
                 onClick={() => setSelected(expanded ? null : r.id)}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '80px 1fr 90px 180px 100px 140px',
+                  gridTemplateColumns: '80px minmax(240px, 1fr) 90px 180px 100px 140px',
+                  minWidth: 820,
                   cursor: 'pointer',
                   borderBottom: '1px solid var(--border-subtle)',
                   background: expanded ? '#14192a' : 'transparent',

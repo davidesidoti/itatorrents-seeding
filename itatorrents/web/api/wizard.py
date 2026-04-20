@@ -66,11 +66,9 @@ def _get(tok: str) -> dict[str, Any]:
 
 
 def _validate_path(p: str) -> Path:
+    from ...media import media_root, seedings_root
     resolved = Path(p).resolve()
-    allowed = [
-        (Path.home() / "media").resolve(),
-        (Path.home() / "seedings").resolve(),
-    ]
+    allowed = [media_root().resolve(), seedings_root().resolve()]
     if not any(str(resolved).startswith(str(a)) for a in allowed):
         raise HTTPException(403, "Path outside allowed directories")
     if not resolved.exists():
@@ -402,4 +400,7 @@ async def wizard_finish(tok: str):
     state = _get(tok)
     state["upload_done"] = True
     state["exit_code"] = 0
+    seeding_path = state.get("seeding_path", "")
+    if seeding_path:
+        await update_exit_code(seeding_path, 0)
     return JSONResponse({"ok": True})

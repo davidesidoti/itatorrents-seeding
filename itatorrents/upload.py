@@ -21,7 +21,7 @@ _ANSI_RE = re.compile(r'\x1b(?:[@-Z\\-_]|\[[0-9;]*[a-zA-Z]|\][^\x07]*\x07)')
 from guessit import guessit
 
 from .core import (
-    SEEDINGS_DIR,
+    seedings_dir,
     build_name,
     extract_specs,
     format_se,
@@ -98,8 +98,9 @@ def build_movie_name_from_file(
 
 
 def do_hardlink_movie(src: Path, final_name: str) -> Path:
-    SEEDINGS_DIR.mkdir(parents=True, exist_ok=True)
-    target = SEEDINGS_DIR / f"{final_name}{src.suffix.lower()}"
+    seed = seedings_dir()
+    seed.mkdir(parents=True, exist_ok=True)
+    target = seed / f"{final_name}{src.suffix.lower()}"
     hardlink_file(src, target, overwrite=True)
     return target
 
@@ -109,8 +110,9 @@ def do_hardlink_series(
     folder_name: str,
     episode_rename: dict[Path, str],
 ) -> Path:
-    SEEDINGS_DIR.mkdir(parents=True, exist_ok=True)
-    target_dir = SEEDINGS_DIR / folder_name
+    seed = seedings_dir()
+    seed.mkdir(parents=True, exist_ok=True)
+    target_dir = seed / folder_name
     if target_dir.exists():
         shutil.rmtree(target_dir)
     hardlink_tree(src_dir, target_dir, episode_rename)

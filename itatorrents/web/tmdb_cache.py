@@ -18,10 +18,18 @@ import threading
 import time
 from pathlib import Path
 
-CACHE_PATH = Path(
-    os.environ.get("ITA_TMDB_CACHE_PATH", str(Path.home() / ".itatorrents_tmdb_cache.json"))
-)
 _lock = threading.Lock()
+
+
+def _cache_path() -> Path:
+    try:
+        from . import config
+        return Path(config.runtime_setting("ITA_TMDB_CACHE_PATH", default=str(Path.home() / ".itatorrents_tmdb_cache.json")))
+    except Exception:
+        return Path(os.environ.get("ITA_TMDB_CACHE_PATH") or (Path.home() / ".itatorrents_tmdb_cache.json"))
+
+
+CACHE_PATH = _cache_path()
 
 
 # ---------------------------------------------------------------------------
@@ -29,18 +37,20 @@ _lock = threading.Lock()
 # ---------------------------------------------------------------------------
 
 def _load() -> dict:
-    if not CACHE_PATH.exists():
+    path = _cache_path()
+    if not path.exists():
         return {}
     try:
-        with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
 
 
 def _save(data: dict):
-    CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(CACHE_PATH, "w", encoding="utf-8") as f:
+    path = _cache_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 

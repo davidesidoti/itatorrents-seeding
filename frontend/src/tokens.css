@@ -118,3 +118,17 @@ code, pre, kbd {
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 @keyframes blink { 50% { opacity: 0; } }
+@keyframes u3d-slide-in { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes u3d-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 768px) {
+  .u3d-hide-mobile { display: none !important; }
+  .u3d-mobile-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+  }
+  .u3d-mobile-fullbleed { padding-left: 14px !important; padding-right: 14px !important; }
+}

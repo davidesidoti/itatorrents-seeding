@@ -127,6 +127,26 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "PANEL_MESSAGE_COLOR": "blue",
     "PANEL_MESSAGE_BORDER_COLOR": "yellow",
     "WELCOME_MESSAGE": "https://itatorrents.xyz",
+
+    # Seeding Flow — runtime settings (can be overridden by ITA_* env vars).
+    # Empty string means "fall back to default resolved in runtime_setting()".
+    "ITA_MEDIA_ROOT": "",
+    "ITA_SEEDINGS_DIR": "",
+    "ITA_DB_PATH": "",
+    "ITA_TMDB_CACHE_PATH": "",
+    "ITA_LANG_CACHE_PATH": "",
+    "ITA_ROOT_PATH": "",
+    "ITA_TMDB_LANG": "it-IT",
+    "ITA_HOST": "127.0.0.1",
+    "ITA_PORT": "8765",
+    "ITA_HTTPS_ONLY": False,
+
+    # Wizard Defaults — control default UI behaviour of the upload wizard.
+    "W_AUDIO_CHECK": True,
+    "W_AUTO_TMDB": True,
+    "W_HIDE_UPLOADED": True,
+    "W_HARDLINK_ONLY": False,
+    "W_CONFIRM_NAMES": True,
 }
 
 MASKED_KEYS = {
@@ -195,27 +215,63 @@ def merge_secrets(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[st
     return out
 
 
-def env_readonly() -> dict[str, str]:
-    """Expose ITA_* env vars that are *not* part of Unit3Dbot.json — displayed
-    read-only in the Seeding Flow settings section so users see the actual
-    values driving the web server + DB layer.
+# ---------------------------------------------------------------------------
+# Runtime settings — resolve from env first, then Unit3Dbot.json, then default.
+# ---------------------------------------------------------------------------
+
+_RUNTIME_DEFAULTS: dict[str, str] = {
+    "ITA_MEDIA_ROOT": str(Path.home() / "media"),
+    "ITA_SEEDINGS_DIR": str(Path.home() / "seedings"),
+    "ITA_DB_PATH": str(Path.home() / ".itatorrents_db.json"),
+    "ITA_TMDB_CACHE_PATH": str(Path.home() / ".itatorrents_tmdb_cache.json"),
+    "ITA_LANG_CACHE_PATH": str(Path.home() / ".itatorrents_lang_cache.json"),
+    "ITA_ROOT_PATH": "",
+    "ITA_TMDB_LANG": "it-IT",
+    "ITA_HOST": "127.0.0.1",
+    "ITA_PORT": "8765",
+    "ITA_HTTPS_ONLY": "0",
+}
+
+
+def runtime_setting(key: str, default: str | None = None) -> str:
+    """Resolve an ITA_* runtime setting. Precedence: env var → Unit3Dbot.json → default.
+
+    Called on every access so settings saved through the web UI take effect
+    without restarting the server.
+    """
+    env_val = os.environ.get(key)
+    if env_val is not None and env_val != "":
+        return env_val
+    cfg_val = load().get(key, "")
+    if isinstance(cfg_val, bool):
+        cfg_val = "1" if cfg_val else "0"
+    if cfg_val:
+        return str(cfg_val)
+    if default is not None:
+        return default
+    return _RUNTIME_DEFAULTS.get(key, "")
+
+
+def env_runtime() -> dict[str, str]:
+    """Effective values shown in the Seeding Flow settings section.
+
+    These combine env + config so users see what the running server is actually
+    using. `UNIT3DUP_CONFIG` is install-time only.
     """
     return {
-        "ITA_HOST": os.environ.get("ITA_HOST", "127.0.0.1"),
-        "ITA_PORT": os.environ.get("ITA_PORT", "8765"),
-        "ITA_ROOT_PATH": os.environ.get("ITA_ROOT_PATH", ""),
-        "ITA_TMDB_LANG": os.environ.get("ITA_TMDB_LANG", "it-IT"),
-        "ITA_HTTPS_ONLY": os.environ.get("ITA_HTTPS_ONLY", "0"),
-        "ITA_DB_PATH": os.environ.get(
-            "ITA_DB_PATH", str(Path.home() / ".itatorrents_db.json")
-        ),
-        "ITA_TMDB_CACHE_PATH": os.environ.get(
-            "ITA_TMDB_CACHE_PATH", str(Path.home() / ".itatorrents_tmdb_cache.json")
-        ),
-        "ITA_LANG_CACHE_PATH": os.environ.get(
-            "ITA_LANG_CACHE_PATH", str(Path.home() / ".itatorrents_lang_cache.json")
-        ),
-        "ITA_MEDIA_ROOT": str(Path.home() / "media"),
-        "ITA_SEEDINGS_DIR": str(Path.home() / "seedings"),
+        "ITA_HOST": runtime_setting("ITA_HOST"),
+        "ITA_PORT": runtime_setting("ITA_PORT"),
+        "ITA_ROOT_PATH": runtime_setting("ITA_ROOT_PATH"),
+        "ITA_TMDB_LANG": runtime_setting("ITA_TMDB_LANG"),
+        "ITA_HTTPS_ONLY": runtime_setting("ITA_HTTPS_ONLY"),
+        "ITA_DB_PATH": runtime_setting("ITA_DB_PATH"),
+        "ITA_TMDB_CACHE_PATH": runtime_setting("ITA_TMDB_CACHE_PATH"),
+        "ITA_LANG_CACHE_PATH": runtime_setting("ITA_LANG_CACHE_PATH"),
+        "ITA_MEDIA_ROOT": runtime_setting("ITA_MEDIA_ROOT"),
+        "ITA_SEEDINGS_DIR": runtime_setting("ITA_SEEDINGS_DIR"),
         "UNIT3DUP_CONFIG": str(_CONFIG_PATH),
     }
+
+
+# Back-compat alias — older call sites still import env_readonly.
+env_readonly = env_runtime

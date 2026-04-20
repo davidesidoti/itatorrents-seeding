@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Film, Tv, Sparkles, RefreshCw, Database, Headphones,
   Pencil, X, Search as SearchIcon, Star,
+  ChevronDown, Folder, BookOpen, Music, Library as LibraryIcon,
 } from 'lucide-react';
 import { api, openSSE } from '../api';
 import type { Category, LibraryItem, Season, WizardCtx } from '../types';
@@ -29,11 +30,20 @@ interface TmdbSearchResult {
   vote?: number;
 }
 
-const CATS: { id: Category; label: string; icon: any }[] = [
-  { id: 'movies', label: 'Movies', icon: Film },
-  { id: 'series', label: 'Series', icon: Tv },
-  { id: 'anime',  label: 'Anime',  icon: Sparkles },
-];
+interface CategoryInfo { id: string; label: string; count: number; }
+
+const CATEGORY_ICON_MAP: Record<string, any> = {
+  movies: Film, film: Film, movie: Film,
+  series: Tv, tv: Tv, shows: Tv,
+  anime: Sparkles,
+  documentaries: BookOpen, documentary: BookOpen, docs: BookOpen,
+  concerts: Music, concert: Music, music: Music,
+};
+
+const iconFor = (id: string) => {
+  const key = id.toLowerCase();
+  return CATEGORY_ICON_MAP[key] || Folder;
+};
 
 const gradient = (seed: string) => {
   let h = 0;
@@ -48,8 +58,8 @@ const posterBg = (item: LibraryItem) =>
     ? `linear-gradient(160deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.75) 100%), url("${item.tmdb_poster}") center/cover`
     : gradient(item.name);
 
-export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) => void }) {
-  const [category, setCategory] = useState<Category>('movies');
+export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: WizardCtx) => void; isMobile?: boolean }) {
+  const [category, setCategory] = useState<Category>('');
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<LibraryItem | null>(null);
@@ -60,8 +70,50 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
   const [sortBy, setSortBy] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [tmdbEditOpen, setTmdbEditOpen] = useState(false);
+  const [categories, setCategories] = useState<CategoryInfo[]>([]);
+  const [mediaRoot, setMediaRoot] = useState('');
+  const [catPickerOpen, setCatPickerOpen] = useState(false);
+  const catBtnRef = useRef<HTMLDivElement | null>(null);
+
+  const loadCategories = async () => {
+    try {
+      const r = await api.get<{
+        root: string;
+        root_exists: boolean;
+        categories: CategoryInfo[];
+      }>('/api/library/categories');
+      setCategories(r.categories);
+      setMediaRoot(r.root);
+      if (!category && r.categories.length) {
+        setCategory(r.categories[0].id);
+      }
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    loadCategories();
+    // Pull W_HIDE_UPLOADED default from settings on mount.
+    api.get<{ config: Record<string, any> }>('/api/settings')
+      .then((s) => {
+        const v = s.config?.W_HIDE_UPLOADED;
+        if (typeof v === 'boolean') setHideUploaded(v);
+      })
+      .catch(() => { /* ignore */ });
+  }, []);
+
+  useEffect(() => {
+    if (!catPickerOpen) return;
+    const close = (e: MouseEvent) => {
+      if (catBtnRef.current && !catBtnRef.current.contains(e.target as Node)) {
+        setCatPickerOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', close);
+    return () => window.removeEventListener('mousedown', close);
+  }, [catPickerOpen]);
 
   const load = async (cat: Category) => {
+    if (!cat) return;
     setLoading(true); setSelected(null);
     try {
       const r = await api.get<{ items: LibraryItem[] }>(`/api/library/${cat}`);
@@ -69,7 +121,10 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(category); }, [category]);
+  useEffect(() => { if (category) load(category); }, [category]);
+
+  const currentCat = categories.find((c) => c.id === category);
+  const currentIcon = currentCat ? iconFor(currentCat.id) : LibraryIcon;
 
   const itemBytes = (it: LibraryItem): number => {
     if (it.seasons && it.seasons.length > 0) {
@@ -139,35 +194,107 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{
-        padding: '12px 18px', borderBottom: '1px solid var(--border-subtle)',
+        padding: isMobile ? '10px 14px' : '12px 18px',
+        borderBottom: '1px solid var(--border-subtle)',
         background: '#0a0c12', display: 'flex', alignItems: 'center',
         gap: 10, flexShrink: 0, flexWrap: 'wrap',
       }}>
-        <div style={{
-          display: 'flex', gap: 3, background: 'var(--bg-card)',
-          borderRadius: 6, padding: 3, border: '1px solid var(--border)',
-        }}>
-          {CATS.map((c) => {
-            const Icon = c.icon;
-            const active = category === c.id;
-            return (
-              <button
-                key={c.id}
-                onClick={() => setCategory(c.id)}
-                style={{
-                  padding: '6px 12px', borderRadius: 4, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  fontSize: 12, fontWeight: 600,
-                  fontFamily: 'var(--font-display)',
-                  background: active ? 'var(--blue)' : 'transparent',
-                  color: active ? '#fff' : 'var(--fg-2)',
-                  border: 'none',
-                }}
-              >
-                <Icon size={12} />{c.label}
-              </button>
-            );
-          })}
+        <div ref={catBtnRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setCatPickerOpen((v) => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '7px 10px', borderRadius: 6,
+              background: 'var(--bg-card)', border: '1px solid var(--border)',
+              color: 'var(--fg-1)', fontSize: 12, fontWeight: 600,
+              fontFamily: 'var(--font-display)', cursor: 'pointer',
+              minWidth: 180,
+            }}
+          >
+            {(() => { const I = currentIcon; return <I size={14} color="var(--blue-bright)" />; })()}
+            <span style={{ flex: 1, textAlign: 'left' }}>
+              {currentCat ? currentCat.label : 'Select category'}
+            </span>
+            {currentCat && (
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 10,
+                color: 'var(--fg-3)',
+              }}>{currentCat.count}</span>
+            )}
+            <ChevronDown size={13} color="var(--fg-3)"
+              style={{ transition: 'transform 150ms',
+                transform: catPickerOpen ? 'rotate(180deg)' : 'none' }} />
+          </button>
+          {catPickerOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+              minWidth: 260, background: '#0a0c12',
+              border: '1px solid var(--border)', borderRadius: 8,
+              boxShadow: '0 12px 40px rgba(0,0,0,0.55)', zIndex: 50,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                padding: '10px 12px', borderBottom: '1px solid var(--border-subtle)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 10, fontWeight: 700,
+                letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
+                color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
+              }}>
+                <LibraryIcon size={11} /> Library Root
+                <span style={{
+                  marginLeft: 'auto', fontFamily: 'var(--font-mono)',
+                  fontSize: 10, fontWeight: 400, letterSpacing: 0,
+                  textTransform: 'none', color: 'var(--fg-3)',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  maxWidth: 160,
+                }} title={mediaRoot}>{mediaRoot || '—'}</span>
+              </div>
+              {categories.length === 0 && (
+                <div style={{
+                  padding: 16, fontSize: 11, color: 'var(--fg-3)',
+                  fontFamily: 'var(--font-display)', textAlign: 'center',
+                }}>No subfolders under the root.</div>
+              )}
+              {categories.map((c) => {
+                const Icon = iconFor(c.id);
+                const active = c.id === category;
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => { setCategory(c.id); setCatPickerOpen(false); }}
+                    style={{
+                      padding: '9px 12px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      background: active ? 'rgba(59,130,246,0.08)' : 'transparent',
+                      borderLeft: active ? '2px solid var(--blue)' : '2px solid transparent',
+                      fontFamily: 'var(--font-display)',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!active) (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    }}
+                  >
+                    <Icon size={13} color={active ? 'var(--blue-bright)' : 'var(--fg-2)'} />
+                    <span style={{
+                      flex: 1, fontSize: 12, fontWeight: 600,
+                      color: active ? 'var(--fg-1)' : 'var(--fg-2)',
+                    }}>{c.label}</span>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10,
+                      color: c.count ? 'var(--fg-3)' : 'var(--fg-4)',
+                    }}>{c.count || 'empty'}</span>
+                  </div>
+                );
+              })}
+              <div style={{
+                padding: '8px 12px', borderTop: '1px solid var(--border-subtle)',
+                fontSize: 10, color: 'var(--fg-4)',
+                fontFamily: 'var(--font-display)',
+              }}>Subfolders of the root are auto-discovered.</div>
+            </div>
+          )}
         </div>
         <input
           value={search}
@@ -199,9 +326,10 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
       </div>
 
       <div style={{
-        padding: '8px 18px', display: 'flex', alignItems: 'center', gap: 12,
+        padding: isMobile ? '8px 14px' : '8px 18px',
+        display: 'flex', alignItems: 'center', gap: 12,
         borderBottom: '1px solid var(--border-subtle)',
-        background: '#0a0c12', flexShrink: 0,
+        background: '#0a0c12', flexShrink: 0, flexWrap: 'wrap',
       }}>
         <div
           style={{
@@ -273,9 +401,13 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{
           flex: 1, display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+          gridTemplateColumns: isMobile
+            ? 'repeat(auto-fill, minmax(110px, 1fr))'
+            : 'repeat(auto-fill, minmax(150px, 1fr))',
           gridAutoRows: 'min-content',
-          gap: 10, padding: '14px 18px', overflowY: 'auto', alignContent: 'start',
+          gap: isMobile ? 8 : 10,
+          padding: isMobile ? '12px 14px' : '14px 18px',
+          overflowY: 'auto', alignContent: 'start',
         }}>
           {filtered.map((item) => {
             const isSeries = !!item.seasons;
@@ -375,6 +507,8 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
             onStart={startWizard}
             onClose={() => setSelected(null)}
             onEditTmdb={() => setTmdbEditOpen(true)}
+            onRescan={(langs) => setSelected((prev) => prev ? { ...prev, langs, lang_scanned: true } : prev)}
+            isMobile={isMobile}
           />
         )}
       </div>
@@ -391,20 +525,46 @@ export function LibraryView({ onStartWizard }: { onStartWizard: (c: WizardCtx) =
 }
 
 function DetailPanel({
-  item, category, onStart, onEditTmdb,
+  item, category, onStart, onClose, onEditTmdb, onRescan, isMobile,
 }: {
   item: LibraryItem;
   category: Category;
   onStart: (kind: 'movie' | 'series' | 'episode', path: string, season?: Season) => void;
   onClose: () => void;
   onEditTmdb: () => void;
+  onRescan?: (langs: string[]) => void;
+  isMobile?: boolean;
 }) {
+  const mobileOverlayStyle = isMobile
+    ? {
+        position: 'fixed' as const, inset: 0, zIndex: 100,
+        background: '#0a0c12', width: 'auto', borderLeft: 'none',
+      }
+    : { width: 360, borderLeft: '1px solid var(--border-subtle)' };
   return (
     <div style={{
-      width: 360, borderLeft: '1px solid var(--border-subtle)',
       display: 'flex', flexDirection: 'column', background: '#0a0c12',
       overflowY: 'auto', flexShrink: 0,
+      ...mobileOverlayStyle,
     }}>
+      {isMobile && (
+        <button
+          onClick={onClose}
+          style={{
+            position: 'sticky', top: 0, zIndex: 2,
+            alignSelf: 'flex-start', margin: 10,
+            background: 'rgba(10,12,18,0.85)',
+            backdropFilter: 'blur(6px)',
+            border: '1px solid var(--border)', borderRadius: 6,
+            padding: '6px 10px', color: 'var(--fg-1)', cursor: 'pointer',
+            fontSize: 12, fontWeight: 600,
+            fontFamily: 'var(--font-display)',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          <X size={14} /> Back to library
+        </button>
+      )}
       <div style={{
         height: 200, background: posterBg(item),
         display: 'flex', alignItems: 'flex-end', padding: 14, flexShrink: 0,
@@ -486,6 +646,7 @@ function DetailPanel({
               >Upload all seasons →</button>
             }/>
             {item.seasons.map((s) => <SeasonRow key={s.number} season={s} item={item} category={category} onStart={onStart} />)}
+            <RescanLangsBtn category={category} name={item.name} onRescan={onRescan} />
           </>
         ) : (
           <>
@@ -511,6 +672,7 @@ function DetailPanel({
               {item.already_uploaded ? 'Already uploaded' : 'Start upload wizard →'}
             </button>
             <MarkUploadedBtn category={category} name={item.name} />
+            <RescanLangsBtn category={category} name={item.name} onRescan={onRescan} />
           </>
         )}
       </div>
@@ -631,6 +793,40 @@ function MarkUploadedBtn({ category, name }: { category: Category; name: string 
   );
 }
 
+function RescanLangsBtn({
+  category, name, onRescan,
+}: { category: Category; name: string; onRescan?: (langs: string[]) => void }) {
+  const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle');
+  const rescan = async () => {
+    setState('loading');
+    try {
+      const r = await api.post<{ ok: boolean; langs: string[] }>(
+        `/api/library/${category}/${encodeURIComponent(name)}/rescan-langs`, {},
+      );
+      onRescan?.(r.langs);
+      setState('done');
+    } catch {
+      setState('idle');
+    }
+  };
+  return (
+    <button
+      onClick={rescan}
+      disabled={state === 'loading'}
+      style={{
+        width: '100%', background: 'transparent',
+        border: '1px solid var(--border)', borderRadius: 6,
+        padding: 8, fontSize: 11, fontWeight: 600,
+        color: state === 'done' ? 'var(--green)' : 'var(--fg-2)',
+        cursor: state === 'loading' ? 'default' : 'pointer',
+        fontFamily: 'var(--font-display)', marginBottom: 6,
+      }}
+    >
+      {state === 'loading' ? 'Scanning…' : state === 'done' ? '✓ Audio languages rescanned' : 'Rescan audio languages'}
+    </button>
+  );
+}
+
 function SectionHeader({ title, right, rightNote }: {
   title: string;
   right?: React.ReactNode;
@@ -677,8 +873,7 @@ function TmdbEditModal({
   onClose: () => void;
   onApplied: () => void;
 }) {
-  const kind = item.kind === 'series' || category === 'series' || category === 'anime'
-    ? 'tv' : 'movie';
+  const kind = item.kind === 'series' ? 'tv' : 'movie';
   const [query, setQuery] = useState(item.tmdb_title_en || item.title || '');
   const [manualId, setManualId] = useState(item.tmdb_id || '');
   const [results, setResults] = useState<TmdbSearchResult[]>([]);
