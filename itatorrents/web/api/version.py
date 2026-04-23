@@ -144,16 +144,33 @@ async def _compute_info() -> dict:
 
 
 def _systemd_available() -> bool:
+    """True iff the systemd unit file exists and is loadable.
+
+    Uses `systemctl --user cat` which returns 0 for any valid state
+    (enabled, linked, static, disabled) and non-zero only when the unit
+    cannot be found. Previous `is-enabled` check incorrectly rejected
+    symlinked (`linked`) units.
+    """
     if not shutil.which("systemctl"):
         return False
     try:
         r = subprocess.run(
-            ["systemctl", "--user", "is-enabled", SYSTEMD_UNIT],
+            ["systemctl", "--user", "cat", SYSTEMD_UNIT],
             capture_output=True, text=True, timeout=5,
         )
-        return r.returncode == 0 or "disabled" in (r.stdout + r.stderr).lower()
+        return r.returncode == 0
     except Exception:
         return False
+
+
+def _install_mode() -> str:
+    """Returns 'git' if the package was installed from a git checkout
+    (has a reachable `.git` at repo root) or 'pip' otherwise (e.g. installed
+    via `pip install git+https://...@tag`, which drops the `.git` folder).
+    """
+    if _repo_root() is not None:
+        return "git"
+    return "pip"
 
 
 async def _get_info(force: bool = False) -> dict:
@@ -290,73 +307,37 @@ def _repo_root() -> Path | None:
 async def update_app():
     async def gen() -> AsyncGenerator[dict, None]:
         before = _current_app_version()
-        yield _sse("start", {"target": "app", "current": before})
+        mode = _install_mode()
+        yield _sse("start", {"target": "app", "current": before, "mode": mode})
 
         if not _systemd_available():
             yield _sse("error", {"message": f"systemd unit '{SYSTEMD_UNIT}' not available"})
             yield _sse("done", {"ok": False})
             return
 
-        repo = _repo_root()
-        if repo is None:
-            yield _sse("error", {"message": "repo .git not found — app not installed from git checkout"})
-            yield _sse("done", {"ok": False})
-            return
+        if mode == "git":
+            async for ev in _update_app_from_git():
+                yield ev
+                data = ev.get("data") or ""
+                if ev["event"] == "done":
+                    try:
+                        if not json.loads(data).get("ok"):
+                            return
+                    except Exception:
+                        return
+                    break
+        else:
+            async for ev in _update_app_from_pip():
+                yield ev
+                data = ev.get("data") or ""
+                if ev["event"] == "done":
+                    try:
+                        if not json.loads(data).get("ok"):
+                            return
+                    except Exception:
+                        return
+                    break
 
-        yield _sse("log", f"repo: {repo}")
-
-        code, branch = await _git(["rev-parse", "--abbrev-ref", "HEAD"], repo)
-        if code != 0:
-            yield _sse("error", {"message": f"git failed: {branch}"})
-            yield _sse("done", {"ok": False})
-            return
-        if branch != "main":
-            yield _sse("error", {"message": f"refuse to update: on branch '{branch}', expected 'main'"})
-            yield _sse("done", {"ok": False})
-            return
-
-        code, dirty = await _git(["status", "--porcelain"], repo)
-        if code != 0:
-            yield _sse("error", {"message": f"git status failed: {dirty}"})
-            yield _sse("done", {"ok": False})
-            return
-        if dirty:
-            yield _sse("error", {"message": "working tree has uncommitted changes — refuse to update"})
-            yield _sse("done", {"ok": False})
-            return
-
-        async for ev in _stream_subprocess(["git", "fetch", "origin", "main"], cwd=repo):
-            if ev["event"] == "exit":
-                if json.loads(ev["data"])["code"] != 0:
-                    yield _sse("error", {"message": "git fetch failed"})
-                    yield _sse("done", {"ok": False})
-                    return
-                break
-            yield ev
-
-        async for ev in _stream_subprocess(["git", "pull", "--ff-only", "origin", "main"], cwd=repo):
-            if ev["event"] == "exit":
-                if json.loads(ev["data"])["code"] != 0:
-                    yield _sse("error", {"message": "git pull failed (not fast-forward?)"})
-                    yield _sse("done", {"ok": False})
-                    return
-                break
-            yield ev
-
-        async for ev in _stream_subprocess(
-            [sys.executable, "-m", "pip", "install", "-e", "."], cwd=repo,
-        ):
-            if ev["event"] == "exit":
-                if json.loads(ev["data"])["code"] != 0:
-                    yield _sse("error", {"message": "pip install -e . failed"})
-                    yield _sse("done", {"ok": False})
-                    return
-                break
-            yield ev
-
-        after = _current_app_version()
-        yield _sse("log", f"restarting systemd unit {SYSTEMD_UNIT}…")
-        yield _sse("done", {"ok": True, "target": "app", "from": before, "to": after})
         await asyncio.sleep(1.5)
 
         try:
@@ -371,3 +352,87 @@ async def update_app():
             yield _sse("error", {"message": f"failed to spawn systemctl: {exc}"})
 
     return EventSourceResponse(gen())
+
+
+async def _update_app_from_git() -> AsyncGenerator[dict, None]:
+    before = _current_app_version()
+    repo = _repo_root()
+    assert repo is not None
+    yield _sse("log", f"install mode: git checkout at {repo}")
+
+    code, branch = await _git(["rev-parse", "--abbrev-ref", "HEAD"], repo)
+    if code != 0:
+        yield _sse("error", {"message": f"git failed: {branch}"})
+        yield _sse("done", {"ok": False})
+        return
+    if branch != "main":
+        yield _sse("error", {"message": f"refuse to update: on branch '{branch}', expected 'main'"})
+        yield _sse("done", {"ok": False})
+        return
+
+    code, dirty = await _git(["status", "--porcelain"], repo)
+    if code != 0:
+        yield _sse("error", {"message": f"git status failed: {dirty}"})
+        yield _sse("done", {"ok": False})
+        return
+    if dirty:
+        yield _sse("error", {"message": "working tree has uncommitted changes — refuse to update"})
+        yield _sse("done", {"ok": False})
+        return
+
+    for argv in (
+        ["git", "fetch", "origin", "main"],
+        ["git", "pull", "--ff-only", "origin", "main"],
+        [sys.executable, "-m", "pip", "install", "-e", "."],
+    ):
+        async for ev in _stream_subprocess(argv, cwd=repo):
+            if ev["event"] == "exit":
+                if json.loads(ev["data"])["code"] != 0:
+                    yield _sse("error", {"message": f"{argv[0]} failed"})
+                    yield _sse("done", {"ok": False})
+                    return
+                break
+            yield ev
+
+    after = _current_app_version()
+    yield _sse("log", f"restarting systemd unit {SYSTEMD_UNIT}…")
+    yield _sse("done", {"ok": True, "target": "app", "from": before, "to": after, "mode": "git"})
+
+
+async def _update_app_from_pip() -> AsyncGenerator[dict, None]:
+    before = _current_app_version()
+    yield _sse("log", "install mode: pip (non-git) — will reinstall from GitHub tag")
+
+    info = await _get_info(force=True)
+    latest = (info.get("app") or {}).get("latest")
+    if not latest:
+        yield _sse("error", {"message": "cannot determine latest release (network issue or no GitHub release yet)"})
+        yield _sse("done", {"ok": False})
+        return
+
+    spec = f"git+https://github.com/{GITHUB_REPO}.git@v{latest}"
+    async for ev in _stream_subprocess(
+        [sys.executable, "-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-deps", spec]
+    ):
+        if ev["event"] == "exit":
+            if json.loads(ev["data"])["code"] != 0:
+                yield _sse("error", {"message": "pip install failed"})
+                yield _sse("done", {"ok": False})
+                return
+            break
+        yield ev
+
+    async for ev in _stream_subprocess(
+        [sys.executable, "-m", "pip", "install", "--upgrade", spec]
+    ):
+        if ev["event"] == "exit":
+            if json.loads(ev["data"])["code"] != 0:
+                yield _sse("error", {"message": "pip install (deps) failed"})
+                yield _sse("done", {"ok": False})
+                return
+            break
+        yield ev
+
+    after = _current_app_version()
+    yield _sse("log", f"restarting systemd unit {SYSTEMD_UNIT}…")
+    yield _sse("done", {"ok": True, "target": "app", "from": before, "to": after, "mode": "pip"})
