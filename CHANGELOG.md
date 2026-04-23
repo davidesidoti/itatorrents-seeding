@@ -10,16 +10,30 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - Sistema di versionamento app: polling ogni 15 min su `/api/version/info` che confronta versione installata con GitHub Releases (app) e PyPI (unit3dup)
 - Banner "Update available" in basso a sinistra nella Sidebar, sopra la lista tracker, con bottone separato per app e unit3dup
 - Update unit3dup via SSE stream (`pip install --upgrade unit3dup`) con log live nel modal
-- Update app via SSE stream con pre-check systemd + restart detached via `systemctl --user restart`
-- Supporto a entrambe le modalità di installazione per l'update app: **git checkout** (`git pull` + `pip install -e .`) e **pip-from-git** (`pip install --upgrade --force-reinstall git+URL@vX`) — rilevate automaticamente dalla presenza di `.git` nella repo root
+- Update app via SSE stream (`git pull --ff-only` + `pip install -e .` + `systemctl --user restart`) con pre-check: branch=main, working tree pulito, systemd disponibile
 - Countdown "Refresh automatico in 5…1" dopo update completato con reload automatico
 - Modal changelog post-reload: mostra release body da GitHub per la versione appena installata
 - Versione app nella Sidebar (header) ora letta dinamicamente dall'API invece di essere hardcoded
 - Endpoint `GET /api/version/changelog?v=X` per ottenere il body Markdown di una release GitHub
-- Auto-detect systemd: update app disabilitato automaticamente se il systemd user unit non è disponibile (dev locale)
+- Auto-detect systemd: update app disabilitato automaticamente se `systemctl --user` non è disponibile (dev locale)
+---
+
+## [0.3.1] - 2026-04-23
+
+Primo rilascio funzionante del sistema di auto-update introdotto in v0.3.0.
 
 ### Fixed
-- Check systemd troppo stretto: `systemctl --user is-enabled` restituisce rc≠0 per unit in stato `linked` (symlink, molto comune su Ultra.cc) o `static` → pulsante "Update app" erroneamente disabilitato. Passato a `systemctl --user cat UNIT` che ritorna 0 iff il file unit esiste, indipendentemente dallo stato di abilitazione.
+- **Update app non funzionava su installazioni pip-from-git**: il flow assumeva un git checkout ma `pip install git+URL@tag` non lascia la cartella `.git`. Aggiunto rilevamento automatico della modalità di installazione (`git` vs `pip`) con flow dedicato per pip: `pip install --upgrade --force-reinstall git+URL@vX`.
+- **Check systemd troppo stretto**: `systemctl --user is-enabled` restituisce rc≠0 per unit in stato `linked` (symlink, comune su Ultra.cc) o `static` → pulsante "Update app" erroneamente disabilitato con `systemd unit not available in this environment`. Passato a `systemctl --user cat UNIT` che ritorna 0 iff il file unit esiste, indipendentemente dallo stato di abilitazione.
+
+### Upgrade notes
+Se stai aggiornando da v0.3.0, il codice attualmente installato contiene i bug sopra quindi non può aggiornarsi autonomamente. Fai il bootstrap una volta manualmente:
+```
+~/.venvs/itatorrents/bin/pip install --upgrade --force-reinstall \
+  "git+https://github.com/davidesidoti/itatorrents-seeding.git@v0.3.1"
+systemctl --user restart itatorrents.service
+```
+Dalla v0.3.1 in poi il pulsante "Update app" funziona dall'UI.
 
 ---
 
