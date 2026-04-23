@@ -19,6 +19,10 @@ export function UpdateProgressModal({ target, onClose, onCompleted }: Props) {
   const [count, setCount] = useState(5);
   const logRef = useRef<HTMLDivElement>(null);
   const closeSSE = useRef<(() => void) | null>(null);
+  const phaseRef = useRef<Phase>('running');
+  const doneRef = useRef(false);
+
+  const setPhaseSafe = (p: Phase) => { phaseRef.current = p; setPhase(p); };
 
   useEffect(() => {
     const path = target === 'app'
@@ -44,25 +48,37 @@ export function UpdateProgressModal({ target, onClose, onCompleted }: Props) {
             setError(data);
             push(`ERROR: ${data}`);
           }
-          setPhase('error');
+          setPhaseSafe('error');
         } else if (name === 'done') {
+          doneRef.current = true;
+          // Close SSE immediately: the backend is about to restart systemd,
+          // which would trigger onerror → EventSource auto-reconnect → loop.
+          closeSSE.current?.();
+          closeSSE.current = null;
           try {
             const j = JSON.parse(data);
             if (j.ok) {
               setFrom(j.from || from);
               setTo(j.to || '');
-              setPhase('countdown');
-            } else if (phase !== 'error') {
-              setPhase('error');
+              setPhaseSafe('countdown');
+            } else if (phaseRef.current !== 'error') {
+              setPhaseSafe('error');
             }
           } catch {
-            setPhase('error');
+            setPhaseSafe('error');
           }
         }
       },
       onError: () => {
-        if (phase === 'countdown') return;
+        if (doneRef.current) return;
+        if (phaseRef.current === 'countdown' || phaseRef.current === 'error') return;
+        // Force-close so EventSource doesn't auto-reconnect and re-trigger
+        // the update on the server.
+        closeSSE.current?.();
+        closeSSE.current = null;
         push('(stream closed)');
+        setError('connessione interrotta');
+        setPhaseSafe('error');
       },
     });
     return () => { closeSSE.current?.(); };
