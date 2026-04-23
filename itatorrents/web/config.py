@@ -146,6 +146,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "W_AUDIO_CHECK": True,
     "W_AUTO_TMDB": True,
     "W_HIDE_UPLOADED": True,
+    "W_HIDE_NO_ITALIAN": False,
     "W_HARDLINK_ONLY": False,
     "W_CONFIRM_NAMES": True,
 }

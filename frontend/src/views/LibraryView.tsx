@@ -64,6 +64,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<LibraryItem | null>(null);
   const [hideUploaded, setHideUploaded] = useState(true);
+  const [hideNoItalian, setHideNoItalian] = useState(false);
   const [search, setSearch] = useState('');
   const [enriching, setEnriching] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -92,11 +93,13 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
 
   useEffect(() => {
     loadCategories();
-    // Pull W_HIDE_UPLOADED default from settings on mount.
+    // Pull W_HIDE_UPLOADED / W_HIDE_NO_ITALIAN defaults from settings on mount.
     api.get<{ config: Record<string, any> }>('/api/settings')
       .then((s) => {
         const v = s.config?.W_HIDE_UPLOADED;
         if (typeof v === 'boolean') setHideUploaded(v);
+        const vi = s.config?.W_HIDE_NO_ITALIAN;
+        if (typeof vi === 'boolean') setHideNoItalian(vi);
       })
       .catch(() => { /* ignore */ });
   }, []);
@@ -137,6 +140,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
     const base = items.filter((it) => {
       if (search && !it.title.toLowerCase().includes(search.toLowerCase())
           && !it.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (hideNoItalian && it.lang_scanned && !it.langs.includes('ITA')) return false;
       if (!hideUploaded) return true;
       if (it.seasons) return !(it.all_seasons_uploaded);
       return !it.already_uploaded;
@@ -151,7 +155,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
       }
       return a.title.localeCompare(b.title) * dir;
     });
-  }, [items, search, hideUploaded, sortBy, sortDir]);
+  }, [items, search, hideUploaded, hideNoItalian, sortBy, sortDir]);
 
   const needTmdb = filtered.filter((i) => !i.tmdb_id).length;
   const needLangs = filtered.filter((i) => !i.lang_scanned).length;
@@ -348,6 +352,24 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
           }}>{hideUploaded && '✓'}</div>
           Hide already uploaded
         </div>
+        <div
+          title="Hide media without a confirmed Italian audio track (unscanned items are kept visible)"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+            fontSize: 11, fontWeight: 600, color: 'var(--fg-2)',
+            fontFamily: 'var(--font-display)',
+          }}
+          onClick={() => setHideNoItalian(!hideNoItalian)}
+        >
+          <div style={{
+            width: 14, height: 14, borderRadius: 3,
+            border: `1px solid ${hideNoItalian ? 'var(--blue)' : 'var(--border)'}`,
+            background: hideNoItalian ? 'var(--blue)' : 'var(--bg-card)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 9, color: '#fff',
+          }}>{hideNoItalian && '✓'}</div>
+          Only with Italian audio
+        </div>
         {needTmdb > 0 && (
           <span style={warnChip}>⚠ {needTmdb} without TMDB match</span>
         )}
@@ -496,6 +518,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
             }}>
               <div style={{ fontSize: 48, marginBottom: 10, opacity: 0.3 }}>∅</div>
               Nothing to show. {hideUploaded && 'Try unchecking "Hide already uploaded".'}
+              {hideNoItalian && ' Try unchecking "Only with Italian audio".'}
             </div>
           )}
         </div>

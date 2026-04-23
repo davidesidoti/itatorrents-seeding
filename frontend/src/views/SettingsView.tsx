@@ -729,6 +729,8 @@ function SeedingSection({
         label="Auto-match TMDB" sub="W_AUTO_TMDB — run TMDB enrichment automatically" />
       <ToggleRow cfg={cfg} set={set} k="W_HIDE_UPLOADED"
         label="Hide already uploaded" sub="W_HIDE_UPLOADED — default state of Library filter" />
+      <ToggleRow cfg={cfg} set={set} k="W_HIDE_NO_ITALIAN"
+        label="Only with Italian audio" sub="W_HIDE_NO_ITALIAN — default Library filter hiding media without an ITA track" />
       <ToggleRow cfg={cfg} set={set} k="W_HARDLINK_ONLY"
         label="Hardlink-only mode" sub="W_HARDLINK_ONLY — skip unit3dup and only create hardlinks" />
       <ToggleRow cfg={cfg} set={set} k="W_CONFIRM_NAMES"
