@@ -687,6 +687,18 @@ function SeedingSection({
         />
       </div>
 
+      <div style={GROUP_LABEL}>App Auto-Update</div>
+      <p style={{
+        fontSize: 11, color: 'var(--fg-4)',
+        fontFamily: 'var(--font-display)', marginBottom: 8,
+      }}>
+        Name of the systemd user unit that runs this service. Used by the "Update app"
+        button to check unit availability and trigger <code>systemctl --user restart</code>{' '}
+        after a successful update. Default: <code>itatorrents.service</code>.
+        Ultra.cc deploys typically use <code>itatorrents-web.service</code>.
+      </p>
+      <Field cfg={cfg} set={set} k="ITA_SYSTEMD_UNIT" label="ITA_SYSTEMD_UNIT" wide />
+
       <div style={GROUP_LABEL}>Effective Values (live)</div>
       <p style={{
         fontSize: 11, color: 'var(--fg-4)',
@@ -717,6 +729,8 @@ function SeedingSection({
         label="Auto-match TMDB" sub="W_AUTO_TMDB — run TMDB enrichment automatically" />
       <ToggleRow cfg={cfg} set={set} k="W_HIDE_UPLOADED"
         label="Hide already uploaded" sub="W_HIDE_UPLOADED — default state of Library filter" />
+      <ToggleRow cfg={cfg} set={set} k="W_HIDE_NO_ITALIAN"
+        label="Only with Italian audio" sub="W_HIDE_NO_ITALIAN — default Library filter hiding media without an ITA track" />
       <ToggleRow cfg={cfg} set={set} k="W_HARDLINK_ONLY"
         label="Hardlink-only mode" sub="W_HARDLINK_ONLY — skip unit3dup and only create hardlinks" />
       <ToggleRow cfg={cfg} set={set} k="W_CONFIRM_NAMES"

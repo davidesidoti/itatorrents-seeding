@@ -6,19 +6,15 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Nuova checkbox **"Only with Italian audio"** nella Media Library: filtra i media il cui audio è già stato scansionato ma non contiene una traccia ITA (gli item non ancora scansionati restano visibili). Default configurabile da **Settings › Wizard Defaults** tramite la nuova chiave `W_HIDE_NO_ITALIAN`.
+- `ITA_SYSTEMD_UNIT` è ora editabile da **Settings › App Auto-Update** e persiste in `Unit3Dbot.json`. La chiave viene letta runtime (non solo all'import) così il bottone "Update app" rileva subito il cambio di nome della unit senza dover riavviare il service.
+- Documentazione aggiornata (`docs/configurazione.md`, `docs/uso-web.md`, `docs/deploy-ultracc.md` + mirror inglesi) con una sezione dedicata all'auto-update in-app, ai pre-requisiti systemd e alla gestione di `ITA_SYSTEMD_UNIT` / `WorkingDirectory` su Ultra.cc.
+- README: menzione del sistema di auto-update nella descrizione del progetto.
+
 ### Fixed
 - **UpdateProgressModal entrava in loop infinito dopo il restart del service**: l'`EventSource` riconnetteva automaticamente quando il service veniva riavviato e il backend rieseguiva l'update da capo. Ora la connessione SSE viene chiusa esplicitamente alla ricezione dell'evento `done` e `onError` non riattiva lo stream se l'update è già concluso.
 
-### Added
-- Sistema di versionamento app: polling ogni 15 min su `/api/version/info` che confronta versione installata con GitHub Releases (app) e PyPI (unit3dup)
-- Banner "Update available" in basso a sinistra nella Sidebar, sopra la lista tracker, con bottone separato per app e unit3dup
-- Update unit3dup via SSE stream (`pip install --upgrade unit3dup`) con log live nel modal
-- Update app via SSE stream (`git pull --ff-only` + `pip install -e .` + `systemctl --user restart`) con pre-check: branch=main, working tree pulito, systemd disponibile
-- Countdown "Refresh automatico in 5…1" dopo update completato con reload automatico
-- Modal changelog post-reload: mostra release body da GitHub per la versione appena installata
-- Versione app nella Sidebar (header) ora letta dinamicamente dall'API invece di essere hardcoded
-- Endpoint `GET /api/version/changelog?v=X` per ottenere il body Markdown di una release GitHub
-- Auto-detect systemd: update app disabilitato automaticamente se `systemctl --user` non è disponibile (dev locale)
 ---
 
 ## [0.3.1] - 2026-04-23
