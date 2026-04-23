@@ -89,11 +89,24 @@ export interface SearchResult {
 
 export type LogKind = 'info' | 'ok' | 'warn' | 'error' | 'debug';
 
+export type LogSource =
+  | 'app'
+  | 'http'
+  | 'upload'
+  | 'client'
+  | 'tracker'
+  | 'wizard'
+  | 'unit3dup'
+  | 'system';
+
 export interface LogLine {
   ts: string;
   kind: LogKind;
   name: string;
   msg: string;
+  source?: LogSource | string;
+  event?: string;
+  count?: number;
 }
 
 export interface WizardState {
