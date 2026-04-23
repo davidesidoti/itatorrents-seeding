@@ -1,6 +1,6 @@
 # Uso › Web UI
 
-La Web UI è una SPA React servita da FastAPI. Copre l'intero workflow ItaTorrents dal browser: scansione libreria, upload guidato, coda torrent, storico, configurazione, log in tempo reale.
+La Web UI è una SPA React servita da FastAPI. Copre l'intero workflow di pre-flight Unit3D dal browser: scansione libreria, upload guidato, coda torrent, storico, configurazione, log in tempo reale.
 
 Avvio:
 

@@ -172,7 +172,7 @@ function AudioStep({ token, onNext, onOverride }: {
       <div style={{
         fontSize: 13, color: 'var(--fg-2)', marginBottom: 14, lineHeight: 1.6,
       }}>
-        Scanning each video file for an Italian audio track (required by ItaTorrents).
+        Scanning each video file for an Italian audio track (required by most Italian-audio trackers).
       </div>
       <div style={{
         background: 'var(--bg-base)', border: '1px solid var(--border-subtle)',

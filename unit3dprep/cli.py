@@ -234,7 +234,7 @@ def handle_folder(folder: Path):
         for orig, new in episode_rename.items():
             print(f"  {orig.name} -> {new}{orig.suffix.lower()}")
 
-    if not prompt_confirm(f"Uploadare '{target_dir.name}' su ItaTorrents? [y/n]: "):
+    if not prompt_confirm(f"Uploadare '{target_dir.name}' tramite unit3dup? [y/n]: "):
         print("Annullato (hardlink rimane in ~/seedings).")
         sys.exit(0)
 

@@ -29,7 +29,7 @@ unit3dprep -u /mnt/media/movies/Dune.Part.Two.2024.mkv
 4. **Final name** — `guessit` + `extract_specs` compose a name per the [naming convention](nomenclatura.md). Editable inline (readline preloads the default).
 5. **Collision check** — if the target exists in `~/seedings/`, prompts *overwrite / skip / cancel*.
 6. **Hardlink** — created at `~/seedings/<final name>.<ext>`.
-7. **Upload confirmation** — *"Upload '<name>' to ItaTorrents? [y/n]"*.
+7. **Upload confirmation** — *"Upload '<name>' via unit3dup? [y/n]"*.
 8. **`unit3dup`** — if accepted, runs `unit3dup -b -u <absolute path>`. Exit code propagated to the shell.
 
 ### Expected output
@@ -40,7 +40,7 @@ Lingua italiana trovata. Proseguo con hardlink e rinomina? [y/n]: y
 Inserisci TMDB ID per movie (guessit: 'Dune Part Two'): 693134
 Nome finale: Dune Parte Due (2024) 2160p UHD BluRay TrueHD 7.1 HDR10 H.265 - ItaTorrentsBot
 Hardlink creato: /home/user/seedings/Dune Parte Due (2024) ... .mkv
-Uploadare 'Dune Parte Due ... .mkv' su ItaTorrents? [y/n]: y
+Uploadare 'Dune Parte Due ... .mkv' tramite unit3dup? [y/n]: y
 [unit3dup output ...]
 ```
 

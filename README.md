@@ -9,7 +9,7 @@
 ![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?style=for-the-badge&logo=github%20Pages&logoColor=white)
 
 Web UI + CLI di pre-flight per tracker Unit3D — pairing diretto con [`unit3dup`](https://pypi.org/project/unit3dup/).
-Verifica tracce audio italiane, rinomina secondo la nomenclatura ItaTorrents (e altri tracker Unit3D), crea hardlink in `~/seedings/` e lancia `unit3dup` per l'upload.
+Verifica tracce audio italiane, rinomina secondo la [nomenclatura ItaTorrents](itatorrents-nomenclatura.md) (utilizzabile anche su altri tracker Unit3D), crea hardlink in `~/seedings/` e lancia `unit3dup` per l'upload.
 
 Include un sistema di **auto-update in-app**: polling GitHub Releases + PyPI, badge "update available" nella Sidebar, click → `pip install` live-streamed + restart del servizio + popup changelog dopo il reload.
 
