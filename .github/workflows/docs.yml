@@ -8,6 +8,8 @@ on:
       - mkdocs.yml
       - requirements-docs.txt
       - .github/workflows/docs.yml
+      - pyproject.toml
+      - CHANGELOG.md
   workflow_dispatch:
 
 permissions:

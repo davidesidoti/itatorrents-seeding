@@ -6,6 +6,9 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Workflow `Deploy docs`: aggiunti `pyproject.toml` e `CHANGELOG.md` ai path filter, così ogni bump di versione/release rideploya automaticamente la documentazione su GitHub Pages (prima il sito restava fermo all'ultima modifica di `docs/`).
+
 ---
 
 ## [0.4.1] - 2026-04-23
