@@ -47,6 +47,32 @@ export interface LibraryItem {
 
 export interface TrackerStatus { name: string; online: boolean; configured?: boolean; }
 
+export interface VersionTarget {
+  current: string | null;
+  latest: string | null;
+  newer: boolean;
+}
+
+export interface VersionAppTarget extends VersionTarget {
+  release?: {
+    version: string;
+    body: string;
+    html_url: string;
+    published_at: string;
+    name: string;
+  } | null;
+}
+
+export interface VersionBotTarget extends VersionTarget {
+  installed: boolean;
+}
+
+export interface VersionInfo {
+  app: VersionAppTarget;
+  unit3dup: VersionBotTarget;
+  can_update_app: boolean;
+}
+
 export interface UploadedRecord {
   id: number;
   category: Category;
@@ -89,11 +115,24 @@ export interface SearchResult {
 
 export type LogKind = 'info' | 'ok' | 'warn' | 'error' | 'debug';
 
+export type LogSource =
+  | 'app'
+  | 'http'
+  | 'upload'
+  | 'client'
+  | 'tracker'
+  | 'wizard'
+  | 'unit3dup'
+  | 'system';
+
 export interface LogLine {
   ts: string;
   kind: LogKind;
   name: string;
   msg: string;
+  source?: LogSource | string;
+  event?: string;
+  count?: number;
 }
 
 export interface WizardState {

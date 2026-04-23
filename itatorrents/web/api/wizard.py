@@ -33,6 +33,7 @@ from ...upload import (
 )
 from ..db import record_upload, update_exit_code
 from ..logbuf import emit as log_emit
+from ..logclass import classify as classify_unit3dup
 
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
 
@@ -358,7 +359,8 @@ async def wizard_upload(tok: str):
         async for ev in stream_unit3dup(args, input_queue=q, tmdb_id=tmdb_id):
             et = ev["type"]
             if et == "log":
-                log_emit("info", ev["data"], "unit3dup")
+                kind, event = classify_unit3dup(ev["data"])
+                log_emit(kind, ev["data"], "unit3dup", source="unit3dup", event=event)
                 yield {"event": "log", "data": ev["data"]}
             elif et == "progress":
                 yield {"event": "progress", "data": ev["data"]}

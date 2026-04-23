@@ -143,15 +143,23 @@ class _NotImplementedClient(TorrentClient):
         raise NotImplementedError(f"{self.name} client not implemented yet")
 
 
+_client_cache: tuple[tuple, TorrentClient] | None = None
+
+
 def get_client(cfg: dict[str, Any]) -> TorrentClient:
+    global _client_cache
     which = (cfg.get("TORRENT_CLIENT") or "qbittorrent").lower()
     if which == "qbittorrent":
-        return QBittorrentClient(
-            host=cfg.get("QBIT_HOST", "127.0.0.1"),
-            port=cfg.get("QBIT_PORT", "15491"),
-            user=cfg.get("QBIT_USER", "admin"),
-            password=cfg.get("QBIT_PASS", ""),
-        )
+        host = cfg.get("QBIT_HOST", "127.0.0.1")
+        port = cfg.get("QBIT_PORT", "15491")
+        user = cfg.get("QBIT_USER", "admin")
+        password = cfg.get("QBIT_PASS", "")
+        key = ("qbittorrent", host, str(port), user, password)
+        if _client_cache is not None and _client_cache[0] == key:
+            return _client_cache[1]
+        cli = QBittorrentClient(host=host, port=port, user=user, password=password)
+        _client_cache = (key, cli)
+        return cli
     if which == "transmission":
         return _NotImplementedClient("transmission")
     if which == "rtorrent":
