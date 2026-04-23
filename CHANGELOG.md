@@ -10,12 +10,16 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - Sistema di versionamento app: polling ogni 15 min su `/api/version/info` che confronta versione installata con GitHub Releases (app) e PyPI (unit3dup)
 - Banner "Update available" in basso a sinistra nella Sidebar, sopra la lista tracker, con bottone separato per app e unit3dup
 - Update unit3dup via SSE stream (`pip install --upgrade unit3dup`) con log live nel modal
-- Update app via SSE stream (`git pull --ff-only` + `pip install -e .` + `systemctl --user restart`) con pre-check: branch=main, working tree pulito, systemd disponibile
+- Update app via SSE stream con pre-check systemd + restart detached via `systemctl --user restart`
+- Supporto a entrambe le modalità di installazione per l'update app: **git checkout** (`git pull` + `pip install -e .`) e **pip-from-git** (`pip install --upgrade --force-reinstall git+URL@vX`) — rilevate automaticamente dalla presenza di `.git` nella repo root
 - Countdown "Refresh automatico in 5…1" dopo update completato con reload automatico
 - Modal changelog post-reload: mostra release body da GitHub per la versione appena installata
 - Versione app nella Sidebar (header) ora letta dinamicamente dall'API invece di essere hardcoded
 - Endpoint `GET /api/version/changelog?v=X` per ottenere il body Markdown di una release GitHub
-- Auto-detect systemd: update app disabilitato automaticamente se `systemctl --user` non è disponibile (dev locale)
+- Auto-detect systemd: update app disabilitato automaticamente se il systemd user unit non è disponibile (dev locale)
+
+### Fixed
+- Check systemd troppo stretto: `systemctl --user is-enabled` restituisce rc≠0 per unit in stato `linked` (symlink, molto comune su Ultra.cc) o `static` → pulsante "Update app" erroneamente disabilitato. Passato a `systemctl --user cat UNIT` che ritorna 0 iff il file unit esiste, indipendentemente dallo stato di abilitazione.
 
 ---
 
