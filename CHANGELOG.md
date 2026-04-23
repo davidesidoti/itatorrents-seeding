@@ -14,16 +14,6 @@ Versioning: [Semantic Versioning](https://semver.org/).
 ### Fixed
 - **UpdateProgressModal entrava in loop infinito dopo il restart del service**: l'`EventSource` riconnetteva automaticamente quando il service veniva riavviato e il backend rieseguiva l'update da capo. Ora la connessione SSE viene chiusa esplicitamente alla ricezione dell'evento `done` e `onError` non riattiva lo stream se l'update è già concluso.
 
-### Added
-- Sistema di versionamento app: polling ogni 15 min su `/api/version/info` che confronta versione installata con GitHub Releases (app) e PyPI (unit3dup)
-- Banner "Update available" in basso a sinistra nella Sidebar, sopra la lista tracker, con bottone separato per app e unit3dup
-- Update unit3dup via SSE stream (`pip install --upgrade unit3dup`) con log live nel modal
-- Update app via SSE stream (`git pull --ff-only` + `pip install -e .` + `systemctl --user restart`) con pre-check: branch=main, working tree pulito, systemd disponibile
-- Countdown "Refresh automatico in 5…1" dopo update completato con reload automatico
-- Modal changelog post-reload: mostra release body da GitHub per la versione appena installata
-- Versione app nella Sidebar (header) ora letta dinamicamente dall'API invece di essere hardcoded
-- Endpoint `GET /api/version/changelog?v=X` per ottenere il body Markdown di una release GitHub
-- Auto-detect systemd: update app disabilitato automaticamente se `systemctl --user` non è disponibile (dev locale)
 ---
 
 ## [0.3.1] - 2026-04-23
