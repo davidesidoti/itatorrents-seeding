@@ -8,6 +8,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.1] - 2026-04-24
+
+### Added
+- **Media Library — Selezione multipla per marcare film come caricati manualmente**: il pulsante "Selezione multipla" appare nella toolbar della Libreria quando almeno un film non ancora caricato è visibile (qualsiasi categoria, incluse quelle miste come `anime` con serie + film). In modalità bulk **solo i file singoli (`kind === 'movie'`) sono selezionabili** — le serie restano visibili ma disabilitate. Action bar con "Seleziona tutti / Deseleziona / Segna come caricati" e feedback `Marcati X/Y`.
+
+---
+
 ## [0.6.0] - 2026-04-24
 
 ### Added

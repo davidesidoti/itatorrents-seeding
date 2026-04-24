@@ -4,6 +4,7 @@ import {
   Film, Tv, Sparkles, RefreshCw, Database, Headphones,
   Pencil, X, Search as SearchIcon, Star,
   ChevronDown, Folder, BookOpen, Music, Library as LibraryIcon,
+  CheckSquare, Square,
 } from 'lucide-react';
 import { api, openSSE } from '../api';
 import type { Category, LibraryItem, Season, WizardCtx } from '../types';
@@ -77,6 +78,10 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
   const [mediaRoot, setMediaRoot] = useState('');
   const [catPickerOpen, setCatPickerOpen] = useState(false);
   const catBtnRef = useRef<HTMLDivElement | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkToast, setBulkToast] = useState<string | null>(null);
 
   const loadCategories = async () => {
     try {
@@ -139,6 +144,12 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
 
   useEffect(() => { if (category) load(category); }, [category]);
 
+  useEffect(() => {
+    setBulkMode(false);
+    setSelectedPaths(new Set());
+    setBulkToast(null);
+  }, [category]);
+
   const currentCat = categories.find((c) => c.id === category);
   const currentIcon = currentCat ? iconFor(currentCat.id) : LibraryIcon;
 
@@ -172,6 +183,61 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
 
   const needTmdb = filtered.filter((i) => !i.tmdb_id).length;
   const needLangs = filtered.filter((i) => !i.lang_scanned).length;
+
+  const selectableFiltered = useMemo(
+    () => filtered.filter((it) => it.kind === 'movie' && !it.already_uploaded),
+    [filtered],
+  );
+  const canBulk = selectableFiltered.length > 0;
+  const selectedCount = selectedPaths.size;
+
+  const toggleBulkMode = () => {
+    setBulkMode((prev) => {
+      const next = !prev;
+      if (next) { setSelected(null); setBulkToast(null); }
+      if (!next) setSelectedPaths(new Set());
+      return next;
+    });
+  };
+
+  const toggleItemSelected = (item: LibraryItem) => {
+    if (item.kind !== 'movie' || item.already_uploaded) return;
+    setSelectedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(item.path)) next.delete(item.path); else next.add(item.path);
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedPaths(new Set(selectableFiltered.map((it) => it.path)));
+  };
+
+  const clearSelection = () => setSelectedPaths(new Set());
+
+  const runBulkMark = async () => {
+    if (bulkBusy || selectedCount === 0) return;
+    const targets = items.filter(
+      (it) => selectedPaths.has(it.path) && it.kind === 'movie' && !it.already_uploaded,
+    );
+    if (targets.length === 0) return;
+    setBulkBusy(true);
+    setBulkToast(null);
+    const results = await Promise.allSettled(
+      targets.map((it) =>
+        api.post(
+          `/api/library/${category}/${encodeURIComponent(it.name)}/mark-uploaded`,
+          { season_path: '', episode_path: '' },
+        ),
+      ),
+    );
+    const ok = results.filter((r) => r.status === 'fulfilled').length;
+    setBulkToast(t('library.bulkDone', { ok, total: targets.length }));
+    setBulkBusy(false);
+    setSelectedPaths(new Set());
+    setBulkMode(false);
+    await reloadKeepSelection(category);
+  };
 
   const runEnrich = () => {
     setEnriching(true);
@@ -340,6 +406,21 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
           <Headphones size={11} />
           {scanning ? t('library.scanning') : t('library.scanLangs')}
         </button>
+        {canBulk && (
+          <button
+            onClick={toggleBulkMode}
+            style={{
+              ...actionBtn,
+              background: bulkMode ? 'var(--blue)' : (actionBtn as any).background,
+              color: bulkMode ? '#fff' : (actionBtn as any).color,
+              borderColor: bulkMode ? 'var(--blue)' : (actionBtn as any).borderColor,
+            }}
+            title={t('library.bulkSelect')}
+          >
+            <CheckSquare size={11} />
+            {bulkMode ? t('library.bulkCancel') : t('library.bulkSelect')}
+          </button>
+        )}
       </div>
 
       <div style={{
@@ -451,20 +532,48 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
               : 0;
             const totalSeasons = isSeries ? item.seasons!.length : 0;
             const selectedHere = selected?.path === item.path;
+            const bulkEligible = bulkMode && item.kind === 'movie';
+            const bulkSelected = bulkEligible && selectedPaths.has(item.path);
+            const bulkDisabled = bulkMode && (item.kind !== 'movie' || item.already_uploaded);
+            const handleClick = () => {
+              if (bulkMode) { toggleItemSelected(item); return; }
+              setSelected(item);
+            };
+            const borderColor = bulkSelected
+              ? 'var(--green)'
+              : selectedHere && !bulkMode
+                ? 'var(--blue)'
+                : 'var(--border)';
             return (
               <div
                 key={item.path}
-                onClick={() => setSelected(item)}
+                onClick={handleClick}
                 style={{
                   background: 'var(--bg-card)',
-                  border: selectedHere
-                    ? '1px solid var(--blue)'
-                    : '1px solid var(--border)',
-                  borderRadius: 6, overflow: 'hidden', cursor: 'pointer',
+                  border: `1px solid ${borderColor}`,
+                  borderRadius: 6, overflow: 'hidden',
+                  cursor: bulkDisabled ? 'not-allowed' : 'pointer',
+                  opacity: bulkDisabled ? 0.45 : 1,
                   transition: 'all 150ms',
                   display: 'flex', flexDirection: 'column',
+                  position: 'relative',
                 }}
               >
+                {bulkMode && (
+                  <div style={{
+                    position: 'absolute', top: 6, right: 6, zIndex: 2,
+                    width: 22, height: 22, borderRadius: 4,
+                    border: `1px solid ${bulkSelected ? 'var(--green)' : 'rgba(255,255,255,0.45)'}`,
+                    background: bulkSelected ? 'var(--green)' : 'rgba(0,0,0,0.55)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.5)',
+                  }}>
+                    {bulkSelected
+                      ? <CheckSquare size={14} />
+                      : <Square size={14} color={bulkDisabled ? 'var(--fg-4)' : '#fff'} />}
+                  </div>
+                )}
                 <div style={{
                   aspectRatio: '2/3', background: posterBg(item),
                   position: 'relative', display: 'flex', alignItems: 'flex-end',
@@ -479,11 +588,13 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
                       <Badge color="var(--yellow)" bg="rgba(245,166,35,0.15)">? langs</Badge>
                     )}
                   </div>
-                  <div style={{ position: 'absolute', top: 6, right: 6 }}>
-                    {item.tmdb_id
-                      ? <Badge>TMDB ✓</Badge>
-                      : <Badge color="var(--red)" bg="var(--red-dim)">no TMDB</Badge>}
-                  </div>
+                  {!bulkMode && (
+                    <div style={{ position: 'absolute', top: 6, right: 6 }}>
+                      {item.tmdb_id
+                        ? <Badge>TMDB ✓</Badge>
+                        : <Badge color="var(--red)" bg="var(--red-dim)">no TMDB</Badge>}
+                    </div>
+                  )}
                   <div style={{
                     fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 700,
                     color: 'rgba(255,255,255,0.85)', lineHeight: 1.3,
@@ -537,7 +648,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
           )}
         </div>
 
-        {selected && (
+        {!bulkMode && selected && (
           <DetailPanel
             item={selected}
             category={category}
@@ -550,6 +661,88 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
           />
         )}
       </div>
+      {bulkMode && (
+        <div style={{
+          flexShrink: 0,
+          background: '#0a0c12',
+          borderTop: '1px solid var(--border)',
+          padding: isMobile ? '10px 14px' : '10px 18px',
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        }}>
+          <span style={{
+            fontSize: 12, fontWeight: 700,
+            color: selectedCount > 0 ? 'var(--green)' : 'var(--fg-3)',
+            fontFamily: 'var(--font-display)',
+          }}>
+            {t('library.bulkSelectedCount', { count: selectedCount })}
+          </span>
+          <button
+            onClick={selectAllVisible}
+            disabled={selectableFiltered.length === 0 || bulkBusy}
+            style={actionBtn}
+          >
+            {t('library.bulkSelectAll')}
+          </button>
+          <button
+            onClick={clearSelection}
+            disabled={selectedCount === 0 || bulkBusy}
+            style={actionBtn}
+          >
+            {t('library.bulkClear')}
+          </button>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={toggleBulkMode}
+            disabled={bulkBusy}
+            style={actionBtn}
+          >
+            {t('library.bulkCancel')}
+          </button>
+          <button
+            onClick={runBulkMark}
+            disabled={selectedCount === 0 || bulkBusy}
+            style={{
+              background: selectedCount > 0 && !bulkBusy ? 'var(--green)' : 'var(--border)',
+              border: 'none', borderRadius: 6,
+              padding: '7px 14px', fontSize: 12, fontWeight: 700,
+              color: '#fff',
+              cursor: selectedCount > 0 && !bulkBusy ? 'pointer' : 'not-allowed',
+              fontFamily: 'var(--font-display)',
+            }}
+          >
+            {bulkBusy ? t('library.bulkMarking') : t('library.bulkMarkUploaded')}
+          </button>
+        </div>
+      )}
+      {bulkToast && (
+        <div style={{
+          position: 'fixed', bottom: 20, left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--green)',
+          color: 'var(--green)',
+          borderRadius: 6, padding: '8px 14px',
+          fontSize: 12, fontWeight: 600,
+          fontFamily: 'var(--font-display)',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.45)',
+          zIndex: 300,
+          display: 'flex', alignItems: 'center', gap: 10,
+          animation: 'u3d-fade-in 150ms ease',
+        }}>
+          <span>{bulkToast}</span>
+          <button
+            onClick={() => setBulkToast(null)}
+            style={{
+              background: 'transparent', border: 'none',
+              color: 'var(--fg-3)', cursor: 'pointer',
+              padding: 0, display: 'flex', alignItems: 'center',
+            }}
+            aria-label={t('common.close')}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
       {tmdbEditOpen && selected && (
         <TmdbEditModal
           item={selected}
