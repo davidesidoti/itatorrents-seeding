@@ -125,10 +125,11 @@ async def _enrich_items(items: list[MediaItem]) -> tuple[set[str], dict, dict]:
             uploaded_season_numbers: list[int] = []
             all_langs: list[str] = []
             any_scanned = False
+            series_root = str(item.path.resolve())
             for season in item.seasons:
                 ssp = str(season.path)
                 ssp_resolved = str(season.path.resolve())
-                season.already_uploaded = ssp_resolved in uploaded_paths
+                season.already_uploaded = ssp_resolved in uploaded_paths or series_root in uploaded_paths
                 uploaded_ep: set[str] = set()
                 for vf in season.video_files:
                     if str(vf.resolve()) in uploaded_paths:

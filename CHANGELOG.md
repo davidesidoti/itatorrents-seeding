@@ -8,6 +8,17 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.1] - 2026-04-24
+
+### Added
+- **Media Library — Mark as uploaded manually per le serie**: il pulsante, finora presente solo per i film, è ora disponibile a tre livelli per le serie TV — intera serie (detail panel), singola stagione (accanto a "Bulk upload season") e singolo episodio (mini chip `✓` accanto a ogni episodio). Utile per ripulire la libreria da contenuti già caricati fuori dall'app.
+
+### Fixed
+- `GET /api/version/info` ora segue i redirect di GitHub: quando un repo viene rinominato, `latest` non è più `null` (polling trasparente verso il nuovo slug).
+- Marcare un'intera serie come caricata manualmente ora propaga correttamente lo stato a tutte le stagioni: la serie viene filtrata da "Hide already uploaded" e mostra il badge uploaded, non solo nella Upload History.
+
+---
+
 ## [0.5.0] - 2026-04-23
 
 Release di rebranding. Il progetto cambia nome da `itatorrents` a **`unit3dprep`** per riflettere il supporto multi-tracker Unit3D (non più solo ItaTorrents). Pairing esplicito con `unit3dup`. Nessun intervento manuale richiesto per gli utenti esistenti: env vars legacy, dotfile e chiavi di configurazione migrano automaticamente.

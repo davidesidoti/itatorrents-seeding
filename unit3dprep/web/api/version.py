@@ -97,6 +97,7 @@ async def _fetch_github_latest(client: httpx.AsyncClient) -> dict | None:
             f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
             headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
             timeout=10.0,
+            follow_redirects=True,
         )
         if r.status_code == 404:
             return None
@@ -227,12 +228,14 @@ async def changelog(v: str = Query(..., min_length=1, max_length=64)):
                 f"https://api.github.com/repos/{GITHUB_REPO}/releases/tags/v{v}",
                 headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
                 timeout=10.0,
+                follow_redirects=True,
             )
             if r.status_code == 404:
                 r = await client.get(
                     f"https://api.github.com/repos/{GITHUB_REPO}/releases/tags/{v}",
                     headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
                     timeout=10.0,
+                    follow_redirects=True,
                 )
             r.raise_for_status()
             j = r.json()

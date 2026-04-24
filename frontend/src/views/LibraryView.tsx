@@ -124,6 +124,18 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
     } finally { setLoading(false); }
   };
 
+  const reloadKeepSelection = async (cat: Category) => {
+    if (!cat) return;
+    try {
+      const r = await api.get<{ items: LibraryItem[] }>(`/api/library/${cat}`);
+      setItems(r.items);
+      setSelected((prev) => {
+        if (!prev) return prev;
+        return r.items.find((it) => it.name === prev.name) ?? prev;
+      });
+    } catch { /* ignore */ }
+  };
+
   useEffect(() => { if (category) load(category); }, [category]);
 
   const currentCat = categories.find((c) => c.id === category);
@@ -531,6 +543,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
             onClose={() => setSelected(null)}
             onEditTmdb={() => setTmdbEditOpen(true)}
             onRescan={(langs) => setSelected((prev) => prev ? { ...prev, langs, lang_scanned: true } : prev)}
+            onMarked={() => reloadKeepSelection(category)}
             isMobile={isMobile}
           />
         )}
@@ -548,7 +561,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
 }
 
 function DetailPanel({
-  item, category, onStart, onClose, onEditTmdb, onRescan, isMobile,
+  item, category, onStart, onClose, onEditTmdb, onRescan, onMarked, isMobile,
 }: {
   item: LibraryItem;
   category: Category;
@@ -556,6 +569,7 @@ function DetailPanel({
   onClose: () => void;
   onEditTmdb: () => void;
   onRescan?: (langs: string[]) => void;
+  onMarked?: () => void;
   isMobile?: boolean;
 }) {
   const mobileOverlayStyle = isMobile
@@ -668,7 +682,15 @@ function DetailPanel({
                 }}
               >Upload all seasons →</button>
             }/>
-            {item.seasons.map((s) => <SeasonRow key={s.number} season={s} item={item} category={category} onStart={onStart} />)}
+            {item.seasons.map((s) => <SeasonRow key={s.number} season={s} item={item} category={category} onStart={onStart} onMarked={onMarked} />)}
+            {!item.all_seasons_uploaded && (
+              <MarkUploadedBtn
+                category={category}
+                name={item.name}
+                onMarked={onMarked}
+                label="Mark whole series as uploaded manually"
+              />
+            )}
             <RescanLangsBtn category={category} name={item.name} onRescan={onRescan} />
           </>
         ) : (
@@ -694,7 +716,7 @@ function DetailPanel({
             >
               {item.already_uploaded ? 'Already uploaded' : 'Start upload wizard →'}
             </button>
-            <MarkUploadedBtn category={category} name={item.name} />
+            <MarkUploadedBtn category={category} name={item.name} onMarked={onMarked} />
             <RescanLangsBtn category={category} name={item.name} onRescan={onRescan} />
           </>
         )}
@@ -704,12 +726,13 @@ function DetailPanel({
 }
 
 function SeasonRow({
-  season, item, category, onStart,
+  season, item, category, onStart, onMarked,
 }: {
   season: Season;
   item: LibraryItem;
   category: Category;
   onStart: (kind: 'movie' | 'series' | 'episode', path: string, season?: Season) => void;
+  onMarked?: () => void;
 }) {
   const pct = Math.round((season.uploaded_episodes / Math.max(1, season.episode_count)) * 100);
   return (
@@ -732,15 +755,25 @@ function SeasonRow({
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           {!season.already_uploaded && (
-            <button
-              onClick={() => onStart('series', season.path, season)}
-              style={{
-                background: 'var(--blue)', border: 'none', borderRadius: 4,
-                padding: '3px 7px', fontSize: 10, fontWeight: 600,
-                color: '#fff', cursor: 'pointer',
-                fontFamily: 'var(--font-display)',
-              }}
-            >Bulk upload season</button>
+            <>
+              <button
+                onClick={() => onStart('series', season.path, season)}
+                style={{
+                  background: 'var(--blue)', border: 'none', borderRadius: 4,
+                  padding: '3px 7px', fontSize: 10, fontWeight: 600,
+                  color: '#fff', cursor: 'pointer',
+                  fontFamily: 'var(--font-display)',
+                }}
+              >Bulk upload season</button>
+              <MarkUploadedBtn
+                category={category}
+                name={item.name}
+                seasonPath={season.path}
+                variant="inline-sm"
+                label="Mark ✓"
+                onMarked={onMarked}
+              />
+            </>
           )}
         </div>
       </div>
@@ -771,20 +804,32 @@ function SeasonRow({
       {!season.already_uploaded && (
         <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {season.video_files.map((vf) => (
-            <button
-              key={vf.path}
-              disabled={vf.uploaded}
-              onClick={() => !vf.uploaded && onStart('episode', vf.path, season)}
-              style={{
-                background: 'var(--bg-base)',
-                border: '1px solid var(--border)', borderRadius: 4,
-                padding: '2px 5px', fontSize: 9, fontWeight: 600,
-                color: vf.uploaded ? 'var(--green)' : 'var(--fg-2)',
-                cursor: vf.uploaded ? 'default' : 'pointer',
-                fontFamily: 'var(--font-display)',
-                opacity: vf.uploaded ? 0.4 : 1,
-              }}
-            >{vf.uploaded ? '✓ ' : ''}{vf.name.replace(/\.[^.]+$/, '').slice(0, 14)}</button>
+            <div key={vf.path} style={{ display: 'inline-flex', gap: 2 }}>
+              <button
+                disabled={vf.uploaded}
+                onClick={() => !vf.uploaded && onStart('episode', vf.path, season)}
+                style={{
+                  background: 'var(--bg-base)',
+                  border: '1px solid var(--border)',
+                  borderRadius: vf.uploaded ? 4 : '4px 0 0 4px',
+                  borderRight: vf.uploaded ? '1px solid var(--border)' : 'none',
+                  padding: '2px 5px', fontSize: 9, fontWeight: 600,
+                  color: vf.uploaded ? 'var(--green)' : 'var(--fg-2)',
+                  cursor: vf.uploaded ? 'default' : 'pointer',
+                  fontFamily: 'var(--font-display)',
+                  opacity: vf.uploaded ? 0.4 : 1,
+                }}
+              >{vf.uploaded ? '✓ ' : ''}{vf.name.replace(/\.[^.]+$/, '').slice(0, 14)}</button>
+              {!vf.uploaded && (
+                <MarkUploadedBtn
+                  category={category}
+                  name={item.name}
+                  episodePath={vf.path}
+                  variant="chip"
+                  onMarked={onMarked}
+                />
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -792,14 +837,72 @@ function SeasonRow({
   );
 }
 
-function MarkUploadedBtn({ category, name }: { category: Category; name: string }) {
+function MarkUploadedBtn({
+  category, name,
+  seasonPath, episodePath,
+  variant = 'full',
+  label,
+  onMarked,
+}: {
+  category: Category;
+  name: string;
+  seasonPath?: string;
+  episodePath?: string;
+  variant?: 'full' | 'inline-sm' | 'chip';
+  label?: string;
+  onMarked?: () => void;
+}) {
   const [done, setDone] = useState(false);
   const mark = async () => {
+    if (done) return;
     try {
-      await api.post(`/api/library/${category}/${encodeURIComponent(name)}/mark-uploaded`, {});
+      await api.post(
+        `/api/library/${category}/${encodeURIComponent(name)}/mark-uploaded`,
+        {
+          season_path: seasonPath ?? '',
+          episode_path: episodePath ?? '',
+        },
+      );
       setDone(true);
+      onMarked?.();
     } catch { /* ignore */ }
   };
+  if (variant === 'inline-sm') {
+    return (
+      <button
+        onClick={mark}
+        disabled={done}
+        title="Mark as uploaded manually"
+        style={{
+          background: 'transparent',
+          border: '1px solid var(--border)', borderRadius: 4,
+          padding: '3px 7px', fontSize: 10, fontWeight: 600,
+          color: done ? 'var(--green)' : 'var(--fg-3)',
+          cursor: done ? 'default' : 'pointer',
+          fontFamily: 'var(--font-display)',
+        }}
+      >{done ? '✓' : (label ?? 'Mark ✓')}</button>
+    );
+  }
+  if (variant === 'chip') {
+    return (
+      <button
+        onClick={mark}
+        disabled={done}
+        title="Mark episode as uploaded manually"
+        style={{
+          background: 'transparent',
+          border: '1px solid var(--border)',
+          borderRadius: '0 4px 4px 0',
+          padding: '2px 5px', fontSize: 9, fontWeight: 700,
+          color: done ? 'var(--green)' : 'var(--fg-3)',
+          cursor: done ? 'default' : 'pointer',
+          fontFamily: 'var(--font-display)',
+          minWidth: 22,
+        }}
+      >{done ? '✓' : (label ?? '✓')}</button>
+    );
+  }
   return (
     <button
       onClick={mark}
@@ -812,7 +915,7 @@ function MarkUploadedBtn({ category, name }: { category: Category; name: string 
         cursor: done ? 'default' : 'pointer',
         fontFamily: 'var(--font-display)', marginBottom: 6,
       }}
-    >{done ? '✓ Marked' : 'Mark as uploaded manually'}</button>
+    >{done ? '✓ Marked' : (label ?? 'Mark as uploaded manually')}</button>
   );
 }
 
