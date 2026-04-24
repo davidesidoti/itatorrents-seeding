@@ -12,6 +12,7 @@ Web UI + CLI di pre-flight per tracker Unit3D — pairing diretto con [`unit3dup
 Verifica tracce audio italiane, rinomina secondo la [nomenclatura ItaTorrents](itatorrents-nomenclatura.md) (utilizzabile anche su altri tracker Unit3D), crea hardlink in `~/seedings/` e lancia `unit3dup` per l'upload.
 
 Include un sistema di **auto-update in-app**: polling GitHub Releases + PyPI, badge "update available" nella Sidebar, click → `pip install` live-streamed + restart del servizio + popup changelog dopo il reload.
+La Web UI è disponibile in **italiano e inglese** (selettore nella TopBar).
 
 ![Media Library](docs/assets/screenshots/media_library.png)
 

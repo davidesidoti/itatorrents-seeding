@@ -59,14 +59,20 @@ export function App() {
   useEffect(() => {
     if (!authed) return;
     let cancelled = false;
-    const fetchVersion = async () => {
+    const fetchVersion = async (force = false) => {
       try {
+        if (force) {
+          try { await api.post<VersionInfo>('/api/version/refresh'); } catch { /* noop */ }
+        }
         const v = await api.get<VersionInfo>('/api/version/info');
         if (!cancelled) setVersionInfo(v);
       } catch { /* ignore */ }
     };
-    fetchVersion();
-    const iv = window.setInterval(fetchVersion, 15 * 60_000);
+    // If we just reloaded after an update, bypass the 10-min server cache so
+    // the new version + button visibility reflect reality immediately.
+    const justUpdated = !!localStorage.getItem('unit3dprep.pendingChangelog');
+    fetchVersion(justUpdated);
+    const iv = window.setInterval(() => fetchVersion(false), 15 * 60_000);
     return () => { cancelled = true; window.clearInterval(iv); };
   }, [authed]);
 

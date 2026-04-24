@@ -8,6 +8,16 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.2] - 2026-04-24
+
+### Fixed
+- **Auto-update: versione e bottone "aggiorna" stantii dopo il reload**. Dopo un update riuscito in pip mode, la TopBar continuava a mostrare la versione precedente e il bottone restava visibile finché l'utente non cliccava di nuovo. Causa: cache in-memory di `/api/version/info` (TTL 10 min) non invalidata dopo `_update_app_from_pip`/`_update_app_from_git`, combinata con il race tra restart systemd e reload frontend. Ora la cache viene azzerata a fine install (entrambi i path) e il frontend forza un `POST /api/version/refresh` al primo fetch dopo un reload post-update (quando presente `unit3dprep.pendingChangelog`).
+
+### Changed
+- Documentazione (`uso-web.md` IT+EN): aggiunte sezioni per UI bilingue IT/EN (v0.6.0) e selezione multipla / bulk mark-uploaded in Media Library (v0.6.1). README aggiornato con menzione lingua. Descrizione GitHub aggiornata per riflettere supporto multi-tracker Unit3D.
+
+---
+
 ## [0.6.1] - 2026-04-24
 
 ### Added

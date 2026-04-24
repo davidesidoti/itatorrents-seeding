@@ -1,6 +1,6 @@
 # Usage › Web UI
 
-The Web UI is a React SPA served by FastAPI. It covers the full Unit3D pre-flight workflow from the browser: library scan, guided upload, torrent queue, history, configuration, real-time logs.
+The Web UI is a React SPA served by FastAPI. It covers the full Unit3D pre-flight workflow from the browser: library scan, guided upload, torrent queue, history, configuration, real-time logs. Available in **Italian and English** (language switcher in the TopBar, *v0.6.0*).
 
 Start:
 
@@ -37,6 +37,8 @@ Features:
 - **Detail panel** — clicking an item opens a side panel (mobile: full-screen overlay) with file list, TMDB match, actions.
 - **Rescan audio languages** — button that streams the `pymediainfo` scan via SSE, updating the cache.
 - **Manual TMDB match** — field to enter an ID, search button with result previews.
+- **Multi-select** — checkbox on each item; action bar with "Select all", "Deselect", "Mark as uploaded" for bulk operations. *(v0.6.1)*
+- **Type filter** — toggle to show only movies (`kind === 'movie'`), hiding series and seasons. *(v0.6.1)*
 
 Relevant endpoints: `GET /api/library/categories`, `GET /api/library/{category}`, `GET /api/library/{category}/{item}`, `POST /api/library/{category}/{item}/langs`, `POST /api/tmdb/search`, `POST /api/tmdb/fetch`.
 
@@ -129,6 +131,7 @@ Sections:
 - **Seeding Flow** — `U3DP_*` with effective values (env vs config) via `env_runtime()`. `UNIT3DUP_CONFIG` is read-only.
 - **App Auto-Update** — `U3DP_SYSTEMD_UNIT`, systemd user unit name used by the "Update app" button for the post-update restart. Default `unit3dprep.service`; on Ultra.cc typically `unit3dprep-web.service`.
 - **Wizard Defaults** — all `W_*`.
+- **Interface** — language selector (IT / EN); preference saved to `localStorage` and synced to `U3DP_LANG` via `PUT /api/settings`. *(v0.6.0)*
 
 Secrets masked as `__SET__` — the field still appears populated. Editing other keys does not wipe secrets.
 

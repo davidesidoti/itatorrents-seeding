@@ -510,6 +510,11 @@ async def _update_app_from_git() -> AsyncGenerator[dict, None]:
         yield ev
 
     after = _current_app_version()
+    # Invalidate /version/info cache so post-reload poll re-computes against
+    # the freshly installed version — otherwise the old process (if still
+    # answering during the restart race) returns stale {newer: true}.
+    _cache["data"] = None
+    _cache["at"] = 0.0
     yield _sse("log", f"restarting systemd unit {_systemd_unit()}…")
     yield _sse("done", {"ok": True, "target": "app", "from": before, "to": after, "mode": "git"})
 
@@ -549,5 +554,7 @@ async def _update_app_from_pip() -> AsyncGenerator[dict, None]:
         yield ev
 
     after = _current_app_version()
+    _cache["data"] = None
+    _cache["at"] = 0.0
     yield _sse("log", f"restarting systemd unit {_systemd_unit()}…")
     yield _sse("done", {"ok": True, "target": "app", "from": before, "to": after, "mode": "pip"})

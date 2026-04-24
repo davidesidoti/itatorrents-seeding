@@ -1,6 +1,6 @@
 # Uso › Web UI
 
-La Web UI è una SPA React servita da FastAPI. Copre l'intero workflow di pre-flight Unit3D dal browser: scansione libreria, upload guidato, coda torrent, storico, configurazione, log in tempo reale.
+La Web UI è una SPA React servita da FastAPI. Copre l'intero workflow di pre-flight Unit3D dal browser: scansione libreria, upload guidato, coda torrent, storico, configurazione, log in tempo reale. Disponibile in **italiano e inglese** (selettore nella TopBar, *v0.6.0*).
 
 Avvio:
 
@@ -37,6 +37,8 @@ Funzionalità:
 - **Detail panel** — click su un item apre un panel laterale (mobile: overlay a tutto schermo) con file list, match TMDB, azioni.
 - **Rescan lingue audio** — bottone che stream-a via SSE la scansione `pymediainfo` aggiornando la cache.
 - **Match TMDB manuale** — campo per inserire un ID, bottone cerca con preview risultati.
+- **Selezione multipla** — checkbox su ogni item; action bar con "Seleziona tutto", "Deseleziona", "Marca come caricato" per operazioni in blocco. *(v0.6.1)*
+- **Filtro tipo** — toggle per mostrare solo film (`kind === 'movie'`), nascondendo serie e stagioni. *(v0.6.1)*
 
 Endpoint coinvolti: `GET /api/library/categories`, `GET /api/library/{category}`, `GET /api/library/{category}/{item}`, `POST /api/library/{category}/{item}/langs`, `POST /api/tmdb/search`, `POST /api/tmdb/fetch`.
 
@@ -129,6 +131,7 @@ Sezioni:
 - **Seeding Flow** — `U3DP_*` con valori effettivi (env vs config) via `env_runtime()`. Read-only per `UNIT3DUP_CONFIG`.
 - **App Auto-Update** — `U3DP_SYSTEMD_UNIT`, nome della systemd user unit usata dal bottone "Update app" per il restart post-aggiornamento. Default `unit3dprep.service`; su Ultra.cc tipicamente `unit3dprep-web.service`.
 - **Wizard Defaults** — tutte le `W_*`.
+- **Interface** — selettore lingua (IT / EN); preferenza salvata in `localStorage` e sincronizzata con `U3DP_LANG` via `PUT /api/settings`. *(v0.6.0)*
 
 Secret mascherati come `__SET__` — il campo appare riempito. Modificare altre chiavi non cancella i secret.
 
