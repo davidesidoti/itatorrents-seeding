@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from ...i18n import get_request_lang, t
 from ..auth import login_session, logout_session, verify_password
 
 router = APIRouter(prefix="/api", tags=["auth"])
@@ -19,7 +20,7 @@ class LoginBody(BaseModel):
 @router.post("/auth/login")
 async def login(request: Request, body: LoginBody):
     if not verify_password(body.password):
-        raise HTTPException(status_code=401, detail="Invalid password")
+        raise HTTPException(status_code=401, detail=t("err.invalid_password", get_request_lang(request)))
     login_session(request, secrets.token_urlsafe(16))
     return JSONResponse({"ok": True})
 

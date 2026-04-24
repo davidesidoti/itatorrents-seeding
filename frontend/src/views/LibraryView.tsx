@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Film, Tv, Sparkles, RefreshCw, Database, Headphones,
   Pencil, X, Search as SearchIcon, Star,
@@ -59,6 +60,7 @@ const posterBg = (item: LibraryItem) =>
     : gradient(item.name);
 
 export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: WizardCtx) => void; isMobile?: boolean }) {
+  const { t } = useTranslation();
   const [category, setCategory] = useState<Category>('');
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,7 +95,6 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
 
   useEffect(() => {
     loadCategories();
-    // Pull W_HIDE_UPLOADED / W_HIDE_NO_ITALIAN defaults from settings on mount.
     api.get<{ config: Record<string, any> }>('/api/settings')
       .then((s) => {
         const v = s.config?.W_HIDE_UPLOADED;
@@ -229,7 +230,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
           >
             {(() => { const I = currentIcon; return <I size={14} color="var(--blue-bright)" />; })()}
             <span style={{ flex: 1, textAlign: 'left' }}>
-              {currentCat ? currentCat.label : 'Select category'}
+              {currentCat ? currentCat.label : t('library.selectCategory')}
             </span>
             {currentCat && (
               <span style={{
@@ -256,7 +257,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
                 letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
                 color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
               }}>
-                <LibraryIcon size={11} /> Library Root
+                <LibraryIcon size={11} /> {t('library.libraryRoot')}
                 <span style={{
                   marginLeft: 'auto', fontFamily: 'var(--font-mono)',
                   fontSize: 10, fontWeight: 400, letterSpacing: 0,
@@ -269,7 +270,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
                 <div style={{
                   padding: 16, fontSize: 11, color: 'var(--fg-3)',
                   fontFamily: 'var(--font-display)', textAlign: 'center',
-                }}>No subfolders under the root.</div>
+                }}>{t('library.noSubfolders')}</div>
               )}
               {categories.map((c) => {
                 const Icon = iconFor(c.id);
@@ -300,7 +301,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
                     <span style={{
                       fontFamily: 'var(--font-mono)', fontSize: 10,
                       color: c.count ? 'var(--fg-3)' : 'var(--fg-4)',
-                    }}>{c.count || 'empty'}</span>
+                    }}>{c.count || t('library.empty')}</span>
                   </div>
                 );
               })}
@@ -308,14 +309,14 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
                 padding: '8px 12px', borderTop: '1px solid var(--border-subtle)',
                 fontSize: 10, color: 'var(--fg-4)',
                 fontFamily: 'var(--font-display)',
-              }}>Subfolders of the root are auto-discovered.</div>
+              }}>{t('library.autoDiscover')}</div>
             </div>
           )}
         </div>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by title…"
+          placeholder={t('library.searchPlaceholder')}
           style={{
             flex: 1, minWidth: 180, background: 'var(--bg-card)',
             border: '1px solid var(--border)', borderRadius: 6,
@@ -329,15 +330,15 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
           style={actionBtn}
         >
           <RefreshCw size={11} style={{ animation: loading ? 'spin 1s linear infinite' : '' }} />
-          {loading ? 'Scanning…' : 'Rescan'}
+          {loading ? t('library.scanning') : t('library.rescan')}
         </button>
         <button disabled={enriching} onClick={runEnrich} style={actionBtn}>
           <Database size={11} />
-          {enriching ? 'Enriching…' : 'Auto-TMDB'}
+          {enriching ? t('library.enriching') : t('library.autoTmdb')}
         </button>
         <button disabled={scanning} onClick={runScanLangs} style={actionBtn}>
           <Headphones size={11} />
-          {scanning ? 'Scanning…' : 'Scan Langs'}
+          {scanning ? t('library.scanning') : t('library.scanLangs')}
         </button>
       </div>
 
@@ -362,10 +363,10 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 9, color: '#fff',
           }}>{hideUploaded && '✓'}</div>
-          Hide already uploaded
+          {t('library.hideUploaded')}
         </div>
         <div
-          title="Hide media without a confirmed Italian audio track (unscanned items are kept visible)"
+          title={t('library.onlyItalian')}
           style={{
             display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
             fontSize: 11, fontWeight: 600, color: 'var(--fg-2)',
@@ -380,13 +381,13 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 9, color: '#fff',
           }}>{hideNoItalian && '✓'}</div>
-          Only with Italian audio
+          {t('library.onlyItalian')}
         </div>
         {needTmdb > 0 && (
-          <span style={warnChip}>⚠ {needTmdb} without TMDB match</span>
+          <span style={warnChip}>⚠ {t('library.withoutTmdb', { n: needTmdb })}</span>
         )}
         {needLangs > 0 && (
-          <span style={warnChip}>⚠ {needLangs} need lang scan</span>
+          <span style={warnChip}>⚠ {t('library.needLangScan', { n: needLangs })}</span>
         )}
         <div style={{
           marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
@@ -395,12 +396,12 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
             fontSize: 10, fontWeight: 700,
             letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
             color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
-          }}>Sort</span>
+          }}>{t('library.sort')}</span>
           <div style={{
             display: 'flex', gap: 2, background: 'var(--bg-card)',
             border: '1px solid var(--border)', borderRadius: 6, padding: 2,
           }}>
-            {([['name', 'Name'], ['year', 'Year'], ['size', 'Size']] as const).map(([k, l]) => (
+            {([['name', t('library.sortName')], ['year', t('library.sortYear')], ['size', t('library.sortSize')]] as const).map(([k, l]) => (
               <button
                 key={k}
                 onClick={() => setSortBy(k)}
@@ -416,7 +417,7 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
           </div>
           <button
             onClick={() => setSortDir(sortDir === 'asc' ? 'desc' : 'asc')}
-            title={`Sort ${sortDir === 'asc' ? 'ascending' : 'descending'}`}
+            title={sortDir === 'asc' ? t('library.sortAsc') : t('library.sortDesc')}
             style={{
               background: 'var(--bg-card)', border: '1px solid var(--border)',
               borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
@@ -424,11 +425,11 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
               fontSize: 11, fontWeight: 700,
               display: 'flex', alignItems: 'center', gap: 3,
             }}
-          >{sortDir === 'asc' ? '↑ A→Z' : '↓ Z→A'}</button>
+          >{sortDir === 'asc' ? t('library.sortAsc') : t('library.sortDesc')}</button>
           <span style={{
             fontSize: 11, color: 'var(--fg-3)',
             fontFamily: 'var(--font-display)', marginLeft: 4,
-          }}>{filtered.length} of {items.length}</span>
+          }}>{t('library.countOf', { filtered: filtered.length, total: items.length })}</span>
         </div>
       </div>
 
@@ -508,15 +509,15 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
                         <span style={{
                           color: uploaded === totalSeasons ? 'var(--green)'
                             : uploaded > 0 ? 'var(--yellow)' : 'var(--fg-3)',
-                        }}>{uploaded}/{totalSeasons} seasons</span>
+                        }}>{t('library.seasons', { uploaded, total: totalSeasons })}</span>
                         <span style={{ color: 'var(--fg-4)' }}>
-                          {item.seasons!.reduce((a, s) => a + s.episode_count, 0)} ep
+                          {item.seasons!.reduce((a, s) => a + s.episode_count, 0)} {t('library.ep')}
                         </span>
                       </>
                     ) : (
                       <span style={{
                         color: item.already_uploaded ? 'var(--green)' : 'var(--fg-3)',
-                      }}>{item.already_uploaded ? '✓ uploaded' : item.size}</span>
+                      }}>{item.already_uploaded ? t('library.uploadedBadge') : item.size}</span>
                     )}
                   </div>
                 </div>
@@ -529,8 +530,9 @@ export function LibraryView({ onStartWizard, isMobile }: { onStartWizard: (c: Wi
               color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
             }}>
               <div style={{ fontSize: 48, marginBottom: 10, opacity: 0.3 }}>∅</div>
-              Nothing to show. {hideUploaded && 'Try unchecking "Hide already uploaded".'}
-              {hideNoItalian && ' Try unchecking "Only with Italian audio".'}
+              {t('library.nothingToShow')}{' '}
+              {hideUploaded && t('library.tryUnhideUploaded')}
+              {hideNoItalian && ' ' + t('library.tryUnhideItalian')}
             </div>
           )}
         </div>
@@ -572,6 +574,7 @@ function DetailPanel({
   onMarked?: () => void;
   isMobile?: boolean;
 }) {
+  const { t } = useTranslation();
   const mobileOverlayStyle = isMobile
     ? {
         position: 'fixed' as const, inset: 0, zIndex: 100,
@@ -599,7 +602,7 @@ function DetailPanel({
             display: 'flex', alignItems: 'center', gap: 6,
           }}
         >
-          <X size={14} /> Back to library
+          <X size={14} /> {t('library.backToLibrary')}
         </button>
       )}
       <div style={{
@@ -652,17 +655,17 @@ function DetailPanel({
           }}>{item.tmdb_overview}</div>
         )}
 
-        <SectionHeader title="Audio Languages" rightNote={item.lang_scanned ? 'cached' : ''} />
+        <SectionHeader title={t('library.sectionAudio')} rightNote={item.lang_scanned ? t('library.cached') : ''} />
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10 }}>
           {item.langs.length
             ? item.langs.map((l) => <LangChip key={l} lang={l} />)
             : <span style={{
                 fontSize: 11, color: 'var(--yellow)',
                 fontFamily: 'var(--font-display)',
-              }}>Not scanned yet · click Scan Langs</span>}
+              }}>{t('library.notScanned')}</span>}
         </div>
 
-        <SectionHeader title="Source Path" />
+        <SectionHeader title={t('library.sectionSourcePath')} />
         <div style={{
           fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-2)',
           background: 'var(--bg-base)', border: '1px solid var(--border-subtle)',
@@ -671,7 +674,7 @@ function DetailPanel({
 
         {item.seasons ? (
           <>
-            <SectionHeader title="Seasons & Episodes" right={
+            <SectionHeader title={t('library.sectionSeasons')} right={
               <button
                 onClick={() => onStart('series', item.path)}
                 style={{
@@ -680,7 +683,7 @@ function DetailPanel({
                   color: '#fff', cursor: 'pointer',
                   fontFamily: 'var(--font-display)',
                 }}
-              >Upload all seasons →</button>
+              >{t('library.uploadAllSeasons')}</button>
             }/>
             {item.seasons.map((s) => <SeasonRow key={s.number} season={s} item={item} category={category} onStart={onStart} onMarked={onMarked} />)}
             {!item.all_seasons_uploaded && (
@@ -688,14 +691,14 @@ function DetailPanel({
                 category={category}
                 name={item.name}
                 onMarked={onMarked}
-                label="Mark whole series as uploaded manually"
+                label={t('library.markSeries')}
               />
             )}
             <RescanLangsBtn category={category} name={item.name} onRescan={onRescan} />
           </>
         ) : (
           <>
-            <SectionHeader title="Files" />
+            <SectionHeader title={t('library.sectionFiles')} />
             {item.video_files?.map((vf) => (
               <div key={vf.path} style={{
                 fontFamily: 'var(--font-mono)', fontSize: 10,
@@ -714,7 +717,7 @@ function DetailPanel({
                 fontFamily: 'var(--font-display)', marginTop: 8, marginBottom: 6,
               }}
             >
-              {item.already_uploaded ? 'Already uploaded' : 'Start upload wizard →'}
+              {item.already_uploaded ? t('library.alreadyUploaded') : t('library.startWizard')}
             </button>
             <MarkUploadedBtn category={category} name={item.name} onMarked={onMarked} />
             <RescanLangsBtn category={category} name={item.name} onRescan={onRescan} />
@@ -734,6 +737,7 @@ function SeasonRow({
   onStart: (kind: 'movie' | 'series' | 'episode', path: string, season?: Season) => void;
   onMarked?: () => void;
 }) {
+  const { t } = useTranslation();
   const pct = Math.round((season.uploaded_episodes / Math.max(1, season.episode_count)) * 100);
   return (
     <div style={{
@@ -764,13 +768,13 @@ function SeasonRow({
                   color: '#fff', cursor: 'pointer',
                   fontFamily: 'var(--font-display)',
                 }}
-              >Bulk upload season</button>
+              >{t('library.bulkUploadSeason')}</button>
               <MarkUploadedBtn
                 category={category}
                 name={item.name}
                 seasonPath={season.path}
                 variant="inline-sm"
-                label="Mark ✓"
+                label={t('library.marked')}
                 onMarked={onMarked}
               />
             </>
@@ -780,7 +784,7 @@ function SeasonRow({
       <div style={{
         fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-3)',
       }}>
-        {season.episode_count} ep · {season.size}
+        {season.episode_count} {t('library.ep')} · {season.size}
         {season.langs.length > 0 && <span style={{ marginLeft: 8 }}>{season.langs.join(' / ')}</span>}
         {!season.langs.length && <span style={{ marginLeft: 8, color: 'var(--yellow)' }}>? langs</span>}
       </div>
@@ -798,7 +802,7 @@ function SeasonRow({
           <div style={{
             fontSize: 9, color: 'var(--yellow)',
             fontFamily: 'var(--font-mono)', marginTop: 3,
-          }}>{season.uploaded_episodes}/{season.episode_count} episodes uploaded</div>
+          }}>{t('library.episodesUploaded', { done: season.uploaded_episodes, total: season.episode_count })}</div>
         </>
       )}
       {!season.already_uploaded && (
@@ -852,6 +856,7 @@ function MarkUploadedBtn({
   label?: string;
   onMarked?: () => void;
 }) {
+  const { t } = useTranslation();
   const [done, setDone] = useState(false);
   const mark = async () => {
     if (done) return;
@@ -872,7 +877,7 @@ function MarkUploadedBtn({
       <button
         onClick={mark}
         disabled={done}
-        title="Mark as uploaded manually"
+        title={t('library.markUploaded')}
         style={{
           background: 'transparent',
           border: '1px solid var(--border)', borderRadius: 4,
@@ -881,7 +886,7 @@ function MarkUploadedBtn({
           cursor: done ? 'default' : 'pointer',
           fontFamily: 'var(--font-display)',
         }}
-      >{done ? '✓' : (label ?? 'Mark ✓')}</button>
+      >{done ? '✓' : (label ?? t('library.marked'))}</button>
     );
   }
   if (variant === 'chip') {
@@ -889,7 +894,7 @@ function MarkUploadedBtn({
       <button
         onClick={mark}
         disabled={done}
-        title="Mark episode as uploaded manually"
+        title={t('library.markUploaded')}
         style={{
           background: 'transparent',
           border: '1px solid var(--border)',
@@ -915,13 +920,14 @@ function MarkUploadedBtn({
         cursor: done ? 'default' : 'pointer',
         fontFamily: 'var(--font-display)', marginBottom: 6,
       }}
-    >{done ? '✓ Marked' : (label ?? 'Mark as uploaded manually')}</button>
+    >{done ? t('library.marked') : (label ?? t('library.markUploaded'))}</button>
   );
 }
 
 function RescanLangsBtn({
   category, name, onRescan,
 }: { category: Category; name: string; onRescan?: (langs: string[]) => void }) {
+  const { t } = useTranslation();
   const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle');
   const rescan = async () => {
     setState('loading');
@@ -948,7 +954,7 @@ function RescanLangsBtn({
         fontFamily: 'var(--font-display)', marginBottom: 6,
       }}
     >
-      {state === 'loading' ? 'Scanning…' : state === 'done' ? '✓ Audio languages rescanned' : 'Rescan audio languages'}
+      {state === 'loading' ? t('library.scanning') : state === 'done' ? t('library.rescanDone') : t('library.rescanLangs')}
     </button>
   );
 }
@@ -999,6 +1005,7 @@ function TmdbEditModal({
   onClose: () => void;
   onApplied: () => void;
 }) {
+  const { t } = useTranslation();
   const kind = item.kind === 'series' ? 'tv' : 'movie';
   const [query, setQuery] = useState(item.tmdb_title_en || item.title || '');
   const [manualId, setManualId] = useState(item.tmdb_id || '');
@@ -1066,7 +1073,7 @@ function TmdbEditModal({
             <div style={{
               fontFamily: 'var(--font-display)', fontSize: 14,
               fontWeight: 700, color: 'var(--fg-1)',
-            }}>Edit TMDB Match</div>
+            }}>{t('library.tmdbEdit')}</div>
             <div style={{
               fontFamily: 'var(--font-mono)', fontSize: 10,
               color: 'var(--fg-3)', marginTop: 2,
@@ -1091,7 +1098,7 @@ function TmdbEditModal({
             letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
             color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
             marginBottom: 6,
-          }}>Search TMDB ({kind})</div>
+          }}>{t('library.tmdbSearch', { kind })}</div>
           <div style={{ position: 'relative' }}>
             <SearchIcon
               size={13}
@@ -1104,7 +1111,7 @@ function TmdbEditModal({
               autoFocus
               value={query}
               onChange={(e) => runSearch(e.target.value)}
-              placeholder="Search by title…"
+              placeholder={t('library.searchPlaceholder')}
               style={{
                 width: '100%', background: 'var(--bg-card)',
                 border: '1px solid var(--border)', borderRadius: 6,
@@ -1130,12 +1137,12 @@ function TmdbEditModal({
             <div style={{
               padding: 24, textAlign: 'center', fontSize: 11,
               color: 'var(--fg-3)', fontFamily: 'var(--font-mono)',
-            }}>Searching TMDB…</div>
+            }}>{t('library.tmdbSearching')}</div>
           ) : results.length === 0 ? (
             <div style={{
               padding: 24, textAlign: 'center', fontSize: 11,
               color: 'var(--fg-3)', fontFamily: 'var(--font-display)',
-            }}>No results — try a different title or paste an ID below.</div>
+            }}>{t('library.tmdbNoResults')}</div>
           ) : results.map((r) => {
             const isCurrent = String(r.id) === String(item.tmdb_id);
             return (
@@ -1178,7 +1185,7 @@ function TmdbEditModal({
                         borderRadius: 3, background: 'var(--green-dim)',
                         color: 'var(--green)',
                         fontFamily: 'var(--font-display)',
-                      }}>CURRENT</span>
+                      }}>{t('library.tmdbCurrent')}</span>
                     )}
                   </div>
                   {r.overview && (
@@ -1217,11 +1224,11 @@ function TmdbEditModal({
             color: 'var(--fg-4)', fontFamily: 'var(--font-display)',
             marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6,
           }}>
-            Or paste TMDB ID manually
+            {t('library.tmdbManualId')}
             <span style={{
               color: 'var(--fg-3)', fontWeight: 400,
               letterSpacing: 0, textTransform: 'none',
-            }}>e.g. from themoviedb.org URL</span>
+            }}>{t('library.tmdbManualHint')}</span>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
@@ -1247,7 +1254,7 @@ function TmdbEditModal({
                 cursor: manualId && !applying ? 'pointer' : 'not-allowed',
                 fontFamily: 'var(--font-display)',
               }}
-            >{applying ? 'Applying…' : 'Apply ID'}</button>
+            >{applying ? t('library.tmdbApplying') : t('library.tmdbApply')}</button>
           </div>
         </div>
       </div>

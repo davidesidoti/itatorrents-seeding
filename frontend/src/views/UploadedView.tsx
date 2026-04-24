@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import type { UploadedRecord } from '../types';
 
@@ -9,6 +10,7 @@ const kindColors: Record<string, { bg: string; fg: string }> = {
 };
 
 export function UploadedView() {
+  const { t } = useTranslation();
   const [records, setRecords] = useState<UploadedRecord[]>([]);
   const [filter, setFilter] = useState<'all' | 'movies' | 'series' | 'anime'>('all');
   const [search, setSearch] = useState('');
@@ -34,9 +36,25 @@ export function UploadedView() {
   };
 
   const del = async (id: number) => {
-    if (!confirm('Delete this record?')) return;
+    if (!confirm(t('uploaded.confirmDelete'))) return;
     try { await api.del(`/api/uploaded/${id}`); load(); } catch { /* ignore */ }
   };
+
+  const filterLabels: Record<string, string> = {
+    all: t('uploaded.filterAll'),
+    movies: t('uploaded.filterMovies'),
+    series: t('uploaded.filterSeries'),
+    anime: t('uploaded.filterAnime'),
+  };
+
+  const colHeaders = [
+    t('uploaded.colKind'),
+    t('uploaded.colTitle'),
+    t('uploaded.colTmdb'),
+    t('uploaded.colUploaded'),
+    t('uploaded.colStatus'),
+    t('uploaded.colActions'),
+  ];
 
   return (
     <div style={{
@@ -48,10 +66,10 @@ export function UploadedView() {
         gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
         gap: 10,
       }}>
-        <StatCard value={stats.total} label="Total uploads" />
-        <StatCard value={stats.success} label="Successful" color="var(--green)" />
-        <StatCard value={stats.failed} label="Failed" color="var(--red)" />
-        <StatCard value={stats.manual} label="Hardlink only" color="var(--yellow)" />
+        <StatCard value={stats.total} label={t('uploaded.totalLabel')} />
+        <StatCard value={stats.success} label={t('uploaded.successLabel')} color="var(--green)" />
+        <StatCard value={stats.failed} label={t('uploaded.failedLabel')} color="var(--red)" />
+        <StatCard value={stats.manual} label={t('uploaded.manualLabel')} color="var(--yellow)" />
       </div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -67,12 +85,12 @@ export function UploadedView() {
               color: filter === k ? '#fff' : 'var(--fg-2)',
               border: filter === k ? 'none' : '1px solid var(--border)',
             }}
-          >{k[0].toUpperCase() + k.slice(1)}</button>
+          >{filterLabels[k]}</button>
         ))}
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search history…"
+          placeholder={t('uploaded.searchPlaceholder')}
           style={{
             flex: 1, minWidth: 180, background: 'var(--bg-card)',
             border: '1px solid var(--border)', borderRadius: 6,
@@ -91,7 +109,7 @@ export function UploadedView() {
           gridTemplateColumns: '80px minmax(240px, 1fr) 90px 180px 100px 140px',
           minWidth: 820,
         }}>
-          {['Kind', 'Title / Final Name', 'TMDB', 'Uploaded', 'Status', 'Actions'].map((h) => (
+          {colHeaders.map((h) => (
             <div key={h} style={th}>{h}</div>
           ))}
         </div>
@@ -147,11 +165,11 @@ export function UploadedView() {
                 </div>
                 <div style={td}>
                   {r.hardlink_only
-                    ? <span style={{ color: 'var(--yellow)', fontWeight: 600 }}>manual</span>
+                    ? <span style={{ color: 'var(--yellow)', fontWeight: 600 }}>{t('uploaded.statusManual')}</span>
                     : r.unit3dup_exit_code === 0
                       ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>✓ exit 0</span>
                       : r.unit3dup_exit_code === null
-                        ? <span style={{ color: 'var(--yellow)' }}>pending</span>
+                        ? <span style={{ color: 'var(--yellow)' }}>{t('uploaded.statusPending')}</span>
                         : <span style={{ color: 'var(--red)', fontWeight: 600 }}>
                             ✗ exit {r.unit3dup_exit_code}
                           </span>}
@@ -166,7 +184,7 @@ export function UploadedView() {
                       fontSize: 10, fontWeight: 600, borderRadius: 4,
                       cursor: 'pointer', fontFamily: 'var(--font-display)',
                     }}
-                  >Delete</button>
+                  >{t('uploaded.deleteBtn')}</button>
                 </div>
               </div>
               {expanded && (
@@ -180,16 +198,16 @@ export function UploadedView() {
                     lineHeight: 1.8,
                   }}>
                     <KV k="ID" v={r.id} />
-                    <KV k="Category" v={r.category} />
-                    <KV k="Source path" v={r.source_path} />
-                    <KV k="Seeding path" v={r.seeding_path} />
-                    <KV k="Final name" v={r.final_name} color="var(--blue-bright)" />
-                    <KV k="TMDB ID" v={r.tmdb_id || '—'} />
-                    <KV k="Uploaded at" v={r.uploaded_at} />
-                    <KV k="unit3dup exit" v={r.unit3dup_exit_code ?? 'pending'}
+                    <KV k={t('uploaded.detailCategory')} v={r.category} />
+                    <KV k={t('uploaded.detailSourcePath')} v={r.source_path} />
+                    <KV k={t('uploaded.detailSeedingPath')} v={r.seeding_path} />
+                    <KV k={t('uploaded.detailFinalName')} v={r.final_name} color="var(--blue-bright)" />
+                    <KV k={t('uploaded.detailTmdbId')} v={r.tmdb_id || '—'} />
+                    <KV k={t('uploaded.detailUploadedAt')} v={r.uploaded_at} />
+                    <KV k={t('uploaded.detailExit')} v={r.unit3dup_exit_code ?? t('uploaded.statusPending')}
                         color={r.unit3dup_exit_code === 0 ? 'var(--green)'
                           : r.unit3dup_exit_code ? 'var(--red)' : 'var(--yellow)'} />
-                    <KV k="Hardlink only" v={r.hardlink_only ? 'yes' : 'no'} />
+                    <KV k={t('uploaded.detailHardlinkOnly')} v={r.hardlink_only ? t('common.yes') : t('common.no')} />
                   </div>
                 </div>
               )}
@@ -200,7 +218,7 @@ export function UploadedView() {
           <div style={{
             padding: '40px 20px', textAlign: 'center',
             color: 'var(--fg-3)', fontFamily: 'var(--font-display)', fontSize: 12,
-          }}>No upload history matches.</div>
+          }}>{t('uploaded.noMatches')}</div>
         )}
       </div>
     </div>

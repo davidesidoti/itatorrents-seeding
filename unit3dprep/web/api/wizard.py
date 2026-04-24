@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any, AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -31,6 +31,7 @@ from ...upload import (
     do_hardlink_series,
     stream_unit3dup,
 )
+from ...i18n import get_request_lang, t as _i18n_t
 from ..db import record_upload, update_exit_code
 from ..logbuf import emit as log_emit
 from ..logclass import classify as classify_unit3dup
@@ -59,21 +60,21 @@ def _create(state: dict[str, Any]) -> str:
     return tok
 
 
-def _get(tok: str) -> dict[str, Any]:
+def _get(tok: str, lang: str | None = None) -> dict[str, Any]:
     s = _sessions.get(tok)
     if s is None:
-        raise HTTPException(404, "Wizard session not found or expired")
+        raise HTTPException(404, _i18n_t("err.wizard_session_expired", lang))
     return s
 
 
-def _validate_path(p: str) -> Path:
+def _validate_path(p: str, lang: str | None = None) -> Path:
     from ...media import media_root, seedings_root
     resolved = Path(p).resolve()
     allowed = [media_root().resolve(), seedings_root().resolve()]
     if not any(str(resolved).startswith(str(a)) for a in allowed):
-        raise HTTPException(403, "Path outside allowed directories")
+        raise HTTPException(403, _i18n_t("err.path_outside", lang))
     if not resolved.exists():
-        raise HTTPException(404, f"Path not found: {resolved}")
+        raise HTTPException(404, _i18n_t("err.path_not_found_at", lang, path=str(resolved)))
     return resolved
 
 
@@ -111,12 +112,13 @@ class StdinBody(BaseModel):
 
 
 @router.post("/wizard/start")
-async def wizard_start(body: StartBody):
-    p = _validate_path(body.path)
+async def wizard_start(request: Request, body: StartBody):
+    lang = get_request_lang(request)
+    p = _validate_path(body.path, lang)
     if body.kind not in {"movie", "series", "episode"}:
-        raise HTTPException(400, "Invalid kind")
+        raise HTTPException(400, _i18n_t("err.invalid_kind", lang))
     if body.kind == "episode" and not p.is_file():
-        raise HTTPException(400, "Episode mode requires a file path")
+        raise HTTPException(400, _i18n_t("err.episode_requires_file", lang))
     state: dict[str, Any] = {
         "path": str(p),
         "category": body.category,
@@ -183,17 +185,18 @@ async def wizard_audio_override(tok: str):
 
 
 @router.post("/wizard/{tok}/tmdb")
-async def wizard_tmdb(tok: str, body: TmdbBody):
-    state = _get(tok)
+async def wizard_tmdb(request: Request, tok: str, body: TmdbBody):
+    lang = get_request_lang(request)
+    state = _get(tok, lang)
     if not state["audio_ok"]:
-        raise HTTPException(400, "Audio check not passed")
+        raise HTTPException(400, _i18n_t("err.audio_check_not_passed", lang))
     loop = asyncio.get_event_loop()
     try:
         data = await loop.run_in_executor(
             None, tmdb_fetch_bilingual, body.tmdb_kind, body.tmdb_id, TMDB_API_KEY
         )
     except Exception as e:
-        raise HTTPException(502, f"TMDB fetch failed: {e}")
+        raise HTTPException(502, _i18n_t("err.tmdb_fetch_failed", lang, error=str(e)))
     title = data.get("title") or ""
     year = tmdb_year(data, body.tmdb_kind)
     state["tmdb_id"] = body.tmdb_id
@@ -241,7 +244,7 @@ async def _build_proposed_names(state: dict[str, Any]) -> dict[str, str]:
     if kind == "episode":
         files = [path] if path.is_file() else list(iter_video_files(path))
         if not files:
-            raise HTTPException(400, "No video file found for episode mode")
+            raise HTTPException(400, _i18n_t("err.no_video_episode"))
         episode_file = files[0]
         season_folder = episode_file.parent
         folder_guess = dict(_guessit(season_folder.name))
@@ -291,8 +294,9 @@ async def wizard_names(tok: str, body: NamesBody):
 
 
 @router.post("/wizard/{tok}/hardlink")
-async def wizard_hardlink(tok: str):
-    state = _get(tok)
+async def wizard_hardlink(request: Request, tok: str):
+    lang = get_request_lang(request)
+    state = _get(tok, lang)
     path = Path(state["path"])
     kind = state["kind"]
     final_names = state["final_names"]
@@ -304,7 +308,7 @@ async def wizard_hardlink(tok: str):
             else:
                 files = list(iter_video_files(path))
                 if not files:
-                    raise HTTPException(400, "No video file found")
+                    raise HTTPException(400, _i18n_t("err.no_video", lang))
                 src = files[0]
             final_name = next(iter(final_names.values()), src.stem)
             target = await loop.run_in_executor(None, do_hardlink_movie, src, final_name)
@@ -338,7 +342,7 @@ async def wizard_hardlink(tok: str):
         raise
     except Exception as e:
         log_emit("error", f"Hardlink failed: {e}", "wizard")
-        raise HTTPException(500, f"Hardlink failed: {e}")
+        raise HTTPException(500, _i18n_t("err.hardlink_failed", lang, error=str(e)))
 
 
 @router.get("/wizard/{tok}/upload")

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X, Sparkles, ExternalLink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 
 interface Release {
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function ChangelogModal({ target, from, to, onClose }: Props) {
+  const { t } = useTranslation();
   const [release, setRelease] = useState<Release | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,11 +28,11 @@ export function ChangelogModal({ target, from, to, onClose }: Props) {
     if (target !== 'app') { setLoading(false); return; }
     api.get<Release>(`/api/version/changelog?v=${encodeURIComponent(to)}`)
       .then((r) => setRelease(r))
-      .catch((e) => setError(e.message || 'changelog non disponibile'))
+      .catch((e) => setError(e.message || t('changelog.unavailable')))
       .finally(() => setLoading(false));
-  }, [target, to]);
+  }, [target, to, t]);
 
-  const title = target === 'app' ? 'App aggiornata' : 'unit3dup aggiornato';
+  const title = target === 'app' ? t('changelog.appUpdated') : t('changelog.unit3dupUpdated');
 
   return (
     <div
@@ -90,15 +92,15 @@ export function ChangelogModal({ target, from, to, onClose }: Props) {
           fontFamily: 'var(--font-mono)', fontSize: 12,
           color: 'var(--fg-2)', lineHeight: 1.6,
         }}>
-          {loading && <div style={{ color: 'var(--fg-4)' }}>caricamento changelog…</div>}
+          {loading && <div style={{ color: 'var(--fg-4)' }}>{t('changelog.loading')}</div>}
           {!loading && target !== 'app' && (
             <div style={{ color: 'var(--fg-3)' }}>
-              unit3dup è stato aggiornato alla versione <b>{to}</b>. Vedi PyPI per il changelog upstream.
+              {t('changelog.unit3dupUpdatedTo')} <b>{to}</b>. {t('changelog.seePyPI')}.
             </div>
           )}
           {!loading && target === 'app' && error && (
             <div style={{ color: 'var(--fg-3)' }}>
-              Changelog non disponibile ({error}).
+              {t('changelog.unavailable')} ({error}).
             </div>
           )}
           {!loading && target === 'app' && release && (
@@ -112,7 +114,7 @@ export function ChangelogModal({ target, from, to, onClose }: Props) {
               <pre style={{
                 whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                 margin: 0, fontFamily: 'inherit',
-              }}>{release.body || '(nessuna nota rilasciata)'}</pre>
+              }}>{release.body || t('changelog.noNotes')}</pre>
               {release.html_url && (
                 <a
                   href={release.html_url}
@@ -124,7 +126,7 @@ export function ChangelogModal({ target, from, to, onClose }: Props) {
                     textDecoration: 'none',
                   }}
                 >
-                  <ExternalLink size={12} /> Apri su GitHub
+                  <ExternalLink size={12} /> {t('changelog.openOnGithub')}
                 </a>
               )}
             </>
@@ -143,7 +145,7 @@ export function ChangelogModal({ target, from, to, onClose }: Props) {
               cursor: 'pointer', fontFamily: 'var(--font-display)',
               fontSize: 12, fontWeight: 600,
             }}
-          >OK</button>
+          >{t('common.ok')}</button>
         </div>
       </div>
     </div>

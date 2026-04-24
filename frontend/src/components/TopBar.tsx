@@ -1,14 +1,6 @@
 import { Menu, Search as SearchIcon, UploadCloud } from 'lucide-react';
-
-const TITLES: Record<string, string> = {
-  queue: 'Upload Queue',
-  upload: 'New Upload',
-  library: 'Media Library',
-  uploaded: 'Upload History',
-  search: 'Search Tracker',
-  settings: 'Configuration',
-  logs: 'Activity Log',
-};
+import { useTranslation } from 'react-i18next';
+import { LangSwitcher } from './LangSwitcher';
 
 interface Props {
   activeView: string;
@@ -22,6 +14,16 @@ interface Props {
 export function TopBar({
   activeView, onUploadClick, queueFilter, onQueueFilterChange, isMobile, onMenuClick,
 }: Props) {
+  const { t } = useTranslation();
+  const TITLES: Record<string, string> = {
+    queue: t('topbar.queue'),
+    upload: t('topbar.upload'),
+    library: t('topbar.library'),
+    uploaded: t('topbar.uploaded'),
+    search: t('topbar.search'),
+    settings: t('topbar.settings'),
+    logs: t('topbar.logs'),
+  };
   const showQueueFilter = activeView === 'queue' && !isMobile;
   return (
     <div style={{
@@ -34,7 +36,7 @@ export function TopBar({
         {isMobile && (
           <button
             onClick={onMenuClick}
-            aria-label="Open menu"
+            aria-label={t('topbar.openMenu')}
             style={{
               background: 'transparent', border: '1px solid var(--border)',
               borderRadius: 6, color: 'var(--fg-2)', cursor: 'pointer',
@@ -47,9 +49,10 @@ export function TopBar({
           fontFamily: 'var(--font-display)', fontSize: 15,
           fontWeight: 600, color: 'var(--fg-1)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{TITLES[activeView] ?? 'Unit3Dup'}</div>
+        }}>{TITLES[activeView] ?? t('topbar.default')}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <LangSwitcher />
         {showQueueFilter && (
           <div style={{ position: 'relative' }}>
             <span style={{
@@ -63,7 +66,7 @@ export function TopBar({
             <input
               value={queueFilter}
               onChange={(e) => onQueueFilterChange(e.target.value)}
-              placeholder="Filter torrents…"
+              placeholder={t('topbar.filterTorrents')}
               style={{
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border)', borderRadius: 6,
@@ -87,7 +90,7 @@ export function TopBar({
           onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--blue-bright)')}
           onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--blue)')}
         >
-          <UploadCloud size={13} />{!isMobile && 'Upload'}
+          <UploadCloud size={13} />{!isMobile && t('topbar.uploadBtn')}
         </button>
       </div>
     </div>

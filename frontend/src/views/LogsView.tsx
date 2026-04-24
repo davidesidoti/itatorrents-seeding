@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { openSSE } from '../api';
 import type { LogLine, LogKind } from '../types';
 
@@ -87,6 +88,7 @@ function loadBool(key: string, fallback: boolean): boolean {
 }
 
 export function LogsView() {
+  const { t } = useTranslation();
   const [lines, setLines] = useState<LogLine[]>([]);
   const [paused, setPaused] = useState(false);
   const [autoScroll, setAutoScroll] = useState<boolean>(() => loadBool(LS_AUTO, true));
@@ -221,7 +223,7 @@ export function LogsView() {
 
         <input
           type="search"
-          placeholder="Cerca…"
+          placeholder={t('logs.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
@@ -240,7 +242,7 @@ export function LogsView() {
             fontFamily: 'var(--font-mono)',
           }}
         >
-          {paused ? 'Resume' : 'Pause'}
+          {paused ? t('logs.resume') : t('logs.pause')}
         </button>
         <button
           onClick={() => setAutoScroll((a) => !a)}
@@ -251,7 +253,7 @@ export function LogsView() {
             color: 'var(--fg-2)', fontFamily: 'var(--font-mono)',
           }}
         >
-          Auto {autoScroll ? 'on' : 'off'}
+          {autoScroll ? t('logs.autoOn') : t('logs.autoOff')}
         </button>
         <button
           onClick={clear}
@@ -261,7 +263,7 @@ export function LogsView() {
             color: 'var(--fg-3)', fontFamily: 'var(--font-mono)',
           }}
         >
-          Clear
+          {t('logs.clear')}
         </button>
       </div>
 
@@ -276,7 +278,7 @@ export function LogsView() {
       >
         {visible.length === 0 && (
           <div style={{ color: 'var(--fg-3)' }}>
-            {lines.length === 0 ? 'Waiting for log output…' : 'Nessuna riga corrisponde ai filtri.'}
+            {lines.length === 0 ? t('logs.waiting') : t('logs.noMatches')}
           </div>
         )}
         {visible.map((l, i) => {

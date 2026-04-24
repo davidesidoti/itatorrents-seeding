@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, ApiError } from '../api';
 
 export function LoginView({ onLoggedIn }: { onLoggedIn: () => void }) {
+  const { t } = useTranslation();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -13,7 +15,7 @@ export function LoginView({ onLoggedIn }: { onLoggedIn: () => void }) {
       await api.post('/api/auth/login', { password });
       onLoggedIn();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Login failed');
+      setError(err instanceof ApiError ? err.message : t('login.failed'));
     } finally {
       setLoading(false);
     }
@@ -38,13 +40,13 @@ export function LoginView({ onLoggedIn }: { onLoggedIn: () => void }) {
         <div style={{
           fontSize: 12, color: 'var(--fg-3)',
           fontFamily: 'var(--font-mono)',
-        }}>Enter password to continue</div>
+        }}>{t('login.prompt')}</div>
         <input
           type="password"
           autoFocus
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="password"
+          placeholder={t('login.placeholder')}
           style={{
             background: 'var(--bg-card)', border: '1px solid var(--border)',
             borderRadius: 6, padding: '10px 12px', fontSize: 13,
@@ -67,7 +69,7 @@ export function LoginView({ onLoggedIn }: { onLoggedIn: () => void }) {
             cursor: password && !loading ? 'pointer' : 'not-allowed',
             fontFamily: 'var(--font-display)',
           }}
-        >{loading ? 'Signing in…' : 'Sign in'}</button>
+        >{loading ? t('login.signingIn') : t('login.signIn')}</button>
       </form>
     </div>
   );

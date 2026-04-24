@@ -1,9 +1,10 @@
 """Tracker search + reseed triggers."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from ...i18n import get_request_lang, t
 from .. import config, trackers
 
 router = APIRouter(prefix="/api", tags=["search"])
@@ -14,13 +15,13 @@ def _build():
 
 
 @router.get("/search")
-async def search(q: str, tracker: str = "ITT"):
+async def search(request: Request, q: str, tracker: str = "ITT"):
     if not q.strip():
         return JSONResponse({"results": [], "tracker": tracker})
     trk_map = _build()
     trk = trk_map.get(tracker.upper())
     if trk is None:
-        raise HTTPException(404, f"Unknown tracker '{tracker}'")
+        raise HTTPException(404, t("err.tracker_unknown", get_request_lang(request), tracker=tracker))
     try:
         results = await trk.search(q)
     except NotImplementedError as e:
@@ -34,8 +35,6 @@ async def search(q: str, tracker: str = "ITT"):
 
 
 @router.post("/reseed/{tracker}/{torrent_id}")
-async def reseed(tracker: str, torrent_id: int):
+async def reseed(request: Request, tracker: str, torrent_id: int):
     # Placeholder: trigger a unit3dup reseed run for a known torrent id.
-    # Real implementation would call unit3dup --reseed or use tracker download
-    # endpoint + enqueue in torrent client. For v1 we expose a clean 501.
-    raise HTTPException(501, "Reseed by tracker id not implemented")
+    raise HTTPException(501, t("err.reseed_not_implemented", get_request_lang(request)))

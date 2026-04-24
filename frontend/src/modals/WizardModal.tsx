@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, openSSE } from '../api';
 import type { WizardCtx } from '../types';
 
 type StepId = 'audio' | 'tmdb' | 'names' | 'hardlink' | 'upload';
 
-const STEPS: { id: StepId; label: string; icon: string }[] = [
-  { id: 'audio',    label: 'Audio Check', icon: '🎧' },
-  { id: 'tmdb',     label: 'TMDB Match',  icon: '🎬' },
-  { id: 'names',    label: 'Rename',      icon: '✎' },
-  { id: 'hardlink', label: 'Hardlink',    icon: '⇢' },
-  { id: 'upload',   label: 'Upload',      icon: '⬆' },
+const STEPS: { id: StepId; labelKey: string; icon: string }[] = [
+  { id: 'audio',    labelKey: 'wizard.stepAudio',    icon: '🎧' },
+  { id: 'tmdb',     labelKey: 'wizard.stepTmdb',     icon: '🎬' },
+  { id: 'names',    labelKey: 'wizard.stepNames',    icon: '✎' },
+  { id: 'hardlink', labelKey: 'wizard.stepHardlink', icon: '⇢' },
+  { id: 'upload',   labelKey: 'wizard.stepUpload',   icon: '⬆' },
 ];
 
 export function WizardModal({ ctx, onClose }: { ctx: WizardCtx; onClose: () => void }) {
+  const { t } = useTranslation();
   const [token, setToken] = useState<string | null>(null);
   const [step, setStep] = useState<StepId>('audio');
   const [startError, setStartError] = useState('');
@@ -30,7 +32,12 @@ export function WizardModal({ ctx, onClose }: { ctx: WizardCtx; onClose: () => v
       .catch((e) => setStartError(e.message || 'failed'));
   }, [ctx]);
 
-  const kindLabel = { movie: 'Single movie', episode: 'Single episode', series: ctx.season ? 'Bulk season' : 'Whole series' }[ctx.kind];
+  const kindLabel = {
+    movie:   t('wizard.kindMovie'),
+    episode: t('wizard.kindEpisode'),
+    series:  ctx.season ? t('wizard.kindBulkSeason') : t('wizard.kindSeries'),
+  }[ctx.kind];
+
   const idx = STEPS.findIndex((s) => s.id === step);
 
   return (
@@ -53,7 +60,7 @@ export function WizardModal({ ctx, onClose }: { ctx: WizardCtx; onClose: () => v
             <div style={{
               fontSize: 15, fontWeight: 700, color: 'var(--fg-1)',
               fontFamily: 'var(--font-display)',
-            }}>Upload Wizard</div>
+            }}>{t('wizard.title')}</div>
             <div style={{
               fontSize: 11, color: 'var(--fg-3)',
               fontFamily: 'var(--font-mono)', marginTop: 2,
@@ -89,7 +96,7 @@ export function WizardModal({ ctx, onClose }: { ctx: WizardCtx; onClose: () => v
                 borderBottom: active ? '2px solid var(--blue)' : '2px solid transparent',
                 fontFamily: 'var(--font-display)',
               }}>
-                <span style={{ marginRight: 5 }}>{s.icon}</span>{s.label}
+                <span style={{ marginRight: 5 }}>{s.icon}</span>{t(s.labelKey)}
               </div>
             );
           })}
@@ -105,7 +112,7 @@ export function WizardModal({ ctx, onClose }: { ctx: WizardCtx; onClose: () => v
           {!token && !startError && (
             <div style={{
               padding: 40, textAlign: 'center', color: 'var(--fg-3)',
-            }}>starting wizard…</div>
+            }}>{t('wizard.starting')}</div>
           )}
           {token && step === 'audio' && (
             <AudioStep
@@ -141,6 +148,7 @@ export function WizardModal({ ctx, onClose }: { ctx: WizardCtx; onClose: () => v
 function AudioStep({ token, onNext, onOverride }: {
   token: string; onNext: () => void; onOverride: () => void;
 }) {
+  const { t } = useTranslation();
   const [files, setFiles] = useState<{ name: string; ok?: boolean; error?: string }[]>([]);
   const [done, setDone] = useState(false);
   const [allOk, setAllOk] = useState(false);
@@ -172,7 +180,7 @@ function AudioStep({ token, onNext, onOverride }: {
       <div style={{
         fontSize: 13, color: 'var(--fg-2)', marginBottom: 14, lineHeight: 1.6,
       }}>
-        Scanning each video file for an Italian audio track (required by most Italian-audio trackers).
+        {t('wizard.audioDesc')}
       </div>
       <div style={{
         background: 'var(--bg-base)', border: '1px solid var(--border-subtle)',
@@ -202,7 +210,7 @@ function AudioStep({ token, onNext, onOverride }: {
           </div>
         ))}
         {!files.length && !done && (
-          <div style={{ padding: 14, color: 'var(--fg-3)' }}>scanning…</div>
+          <div style={{ padding: 14, color: 'var(--fg-3)' }}>{t('wizard.audioScanning')}</div>
         )}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 18 }}>
@@ -215,7 +223,7 @@ function AudioStep({ token, onNext, onOverride }: {
               fontSize: 11, fontWeight: 600, cursor: 'pointer',
               fontFamily: 'var(--font-display)',
             }}
-          >Override &amp; continue anyway</button>
+          >{t('wizard.audioOverride')}</button>
         ) : <span />}
         <button
           onClick={onNext}
@@ -227,7 +235,7 @@ function AudioStep({ token, onNext, onOverride }: {
             fontWeight: 600, cursor: allOk ? 'pointer' : 'not-allowed',
             fontFamily: 'var(--font-display)',
           }}
-        >Next: TMDB Match →</button>
+        >{t('wizard.audioNext')}</button>
       </div>
     </div>
   );
@@ -236,6 +244,7 @@ function AudioStep({ token, onNext, onOverride }: {
 function TmdbStep({ token, ctx, onNext }: {
   token: string; ctx: WizardCtx; onNext: () => void;
 }) {
+  const { t } = useTranslation();
   const [tmdbId, setTmdbId] = useState(ctx.tmdbId ?? '');
   const [kind, setKind] = useState(ctx.kind === 'movie' ? 'movie' : 'tv');
   const [loading, setLoading] = useState(false);
@@ -261,7 +270,7 @@ function TmdbStep({ token, ctx, onNext }: {
     <div style={{ padding: '20px 24px' }}>
       <div style={{
         fontSize: 13, color: 'var(--fg-2)', marginBottom: 14,
-      }}>Enter the TMDB ID — titles are fetched bilingual (IT + EN).</div>
+      }}>{t('wizard.tmdbDesc')}</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
         <select
           value={kind}
@@ -278,7 +287,7 @@ function TmdbStep({ token, ctx, onNext }: {
         <input
           value={tmdbId}
           onChange={(e) => { setTmdbId(e.target.value); setMatched(null); }}
-          placeholder="TMDB ID e.g. 155"
+          placeholder={t('wizard.tmdbPlaceholder')}
           style={{
             flex: 1, background: 'var(--bg-card)',
             border: '1px solid var(--border)', borderRadius: 6,
@@ -296,7 +305,7 @@ function TmdbStep({ token, ctx, onNext }: {
             fontWeight: 600, cursor: tmdbId && !loading ? 'pointer' : 'not-allowed',
             fontFamily: 'var(--font-display)',
           }}
-        >{loading ? '…' : 'Lookup'}</button>
+        >{loading ? '…' : t('wizard.tmdbLookup')}</button>
       </div>
       {error && (
         <div style={{
@@ -327,14 +336,14 @@ function TmdbStep({ token, ctx, onNext }: {
             <div style={{
               fontSize: 11, color: 'var(--fg-3)',
               fontFamily: 'var(--font-mono)', marginTop: 2, marginBottom: 8,
-            }}>Year {matched.year} · TMDB {tmdbId} · {kind}</div>
+            }}>{t('wizard.tmdbYear')} {matched.year} · TMDB {tmdbId} · {kind}</div>
             <div style={{
               fontSize: 11, color: 'var(--fg-2)', lineHeight: 1.5,
             }}>{matched.overview}</div>
             <div style={{
               marginTop: 8, fontSize: 10,
               fontFamily: 'var(--font-mono)', color: 'var(--green)',
-            }}>✓ Bilingual metadata cached</div>
+            }}>{t('wizard.tmdbBilingual')}</div>
           </div>
         </div>
       )}
@@ -349,13 +358,14 @@ function TmdbStep({ token, ctx, onNext }: {
             fontWeight: 600, cursor: matched ? 'pointer' : 'not-allowed',
             fontFamily: 'var(--font-display)',
           }}
-        >Next: Rename →</button>
+        >{t('wizard.tmdbNext')}</button>
       </div>
     </div>
   );
 }
 
 function NamesStep({ token, onNext }: { token: string; onNext: () => void; }) {
+  const { t } = useTranslation();
   const [names, setNames] = useState<Record<string, string>>({});
   const [folder, setFolder] = useState('');
   const [loading, setLoading] = useState(true);
@@ -375,7 +385,7 @@ function NamesStep({ token, onNext }: { token: string; onNext: () => void; }) {
     onNext();
   };
 
-  if (loading) return <div style={{ padding: 30, color: 'var(--fg-3)' }}>loading proposed names…</div>;
+  if (loading) return <div style={{ padding: 30, color: 'var(--fg-3)' }}>{t('wizard.namesLoading')}</div>;
 
   const entries = Object.entries(names);
 
@@ -384,8 +394,8 @@ function NamesStep({ token, onNext }: { token: string; onNext: () => void; }) {
       <div style={{
         fontSize: 13, color: 'var(--fg-2)', marginBottom: 14, lineHeight: 1.6,
       }}>
-        Proposed names follow ItaTorrents nomenclature.
-        <span style={{ color: 'var(--yellow)' }}> Edit anything that looks wrong before creating hardlinks.</span>
+        {t('wizard.namesDesc')}
+        <span style={{ color: 'var(--yellow)' }}>{t('wizard.namesWarning')}</span>
       </div>
       {folder && (
         <div style={{ marginBottom: 12 }}>
@@ -393,7 +403,7 @@ function NamesStep({ token, onNext }: { token: string; onNext: () => void; }) {
             fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
             letterSpacing: 'var(--tracking-wider)', color: 'var(--fg-4)',
             display: 'block', marginBottom: 4,
-          }}>Folder name (seedings/…)</label>
+          }}>{t('wizard.namesFolderLabel')}</label>
           <input
             value={folder}
             onChange={(e) => setFolder(e.target.value)}
@@ -442,7 +452,7 @@ function NamesStep({ token, onNext }: { token: string; onNext: () => void; }) {
             fontWeight: 600, cursor: 'pointer',
             fontFamily: 'var(--font-display)',
           }}
-        >Next: Hardlink →</button>
+        >{t('wizard.namesNext')}</button>
       </div>
     </div>
   );
@@ -451,6 +461,7 @@ function NamesStep({ token, onNext }: { token: string; onNext: () => void; }) {
 function HardlinkStep({ token, onNext, onFinishOnly }: {
   token: string; onNext: () => void; onFinishOnly: () => void;
 }) {
+  const { t } = useTranslation();
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
   const [seedingPath, setSeedingPath] = useState('');
@@ -483,7 +494,7 @@ function HardlinkStep({ token, onNext, onFinishOnly }: {
       <div style={{
         fontSize: 13, color: 'var(--fg-2)', marginBottom: 14, lineHeight: 1.6,
       }}>
-        About to create {count} hardlink{count > 1 ? 's' : ''}. No disk copy — same inode, same filesystem.
+        {t('wizard.hardlinkAbout', { count })}
       </div>
       <div style={{
         background: 'var(--bg-base)', border: '1px solid var(--border-subtle)',
@@ -493,9 +504,9 @@ function HardlinkStep({ token, onNext, onFinishOnly }: {
           display: 'grid', gridTemplateColumns: '90px 1fr', gap: 8,
           fontSize: 11, fontFamily: 'var(--font-mono)',
         }}>
-          <span style={{ color: 'var(--fg-3)' }}>Source</span>
+          <span style={{ color: 'var(--fg-3)' }}>{t('wizard.hardlinkSource')}</span>
           <span style={{ color: 'var(--fg-1)', wordBreak: 'break-all' }}>{state?.path}</span>
-          <span style={{ color: 'var(--fg-3)' }}>Files</span>
+          <span style={{ color: 'var(--fg-3)' }}>{t('wizard.hardlinkFiles')}</span>
           <span style={{ color: 'var(--fg-1)' }}>{count}</span>
         </div>
       </div>
@@ -510,7 +521,7 @@ function HardlinkStep({ token, onNext, onFinishOnly }: {
           onChange={(e) => setHardlinkOnly(e.target.checked)}
           style={{ accentColor: 'var(--blue)' }}
         />
-        Hardlink only — skip unit3dup upload (mark as manually uploaded)
+        {t('wizard.hardlinkOnlyLabel')}
       </label>
       {error && (
         <div style={{
@@ -530,14 +541,14 @@ function HardlinkStep({ token, onNext, onFinishOnly }: {
             cursor: running ? 'default' : 'pointer',
             fontFamily: 'var(--font-display)',
           }}
-        >{running ? 'Linking…' : 'Execute hardlink'}</button>
+        >{running ? t('wizard.hardlinkLinking') : t('wizard.hardlinkExecute')}</button>
       ) : (
         <div style={{
           background: '#0a0c12', border: '1px solid var(--green-dim)',
           borderRadius: 6, padding: 12,
           color: 'var(--green)', fontSize: 12, fontFamily: 'var(--font-mono)',
           wordBreak: 'break-all',
-        }}>✓ Hardlinked to {seedingPath}</div>
+        }}>{t('wizard.hardlinkDone', { path: seedingPath })}</div>
       )}
       {done && (
         <div style={{
@@ -552,7 +563,7 @@ function HardlinkStep({ token, onNext, onFinishOnly }: {
                 fontWeight: 700, cursor: 'pointer',
                 fontFamily: 'var(--font-display)',
               }}
-            >Finish (no upload) ✓</button>
+            >{t('wizard.hardlinkFinishOnly')}</button>
           ) : (
             <button
               onClick={onNext}
@@ -562,7 +573,7 @@ function HardlinkStep({ token, onNext, onFinishOnly }: {
                 fontWeight: 600, cursor: 'pointer',
                 fontFamily: 'var(--font-display)',
               }}
-            >Run unit3dup →</button>
+            >{t('wizard.hardlinkRunUnit3dup')}</button>
           )}
         </div>
       )}
@@ -571,6 +582,7 @@ function HardlinkStep({ token, onNext, onFinishOnly }: {
 }
 
 function UploadStep({ token, onClose }: { token: string; onClose: () => void; }) {
+  const { t } = useTranslation();
   type Line = { t: string; msg: string };
   const [lines, setLines] = useState<Line[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
@@ -622,7 +634,7 @@ function UploadStep({ token, onClose }: { token: string; onClose: () => void; })
           background: done ? (exitCode === 0 ? 'var(--green)' : 'var(--red)') : 'var(--blue)',
           animation: done ? '' : 'pulse 1.5s infinite',
         }} />
-        Streaming unit3dup output via SSE
+        {t('wizard.uploadStreaming')}
       </div>
       <div
         ref={logRef}
@@ -661,9 +673,11 @@ function UploadStep({ token, onClose }: { token: string; onClose: () => void; })
           }}>⚠ {prompt.text}</div>
           {prompt.kind === 'duplicate' ? (
             <div style={{ display: 'flex', gap: 6 }}>
-              {[['c', 'Continue', 'var(--blue)', '#fff'],
-                ['s', 'Skip',     'var(--bg-card)', 'var(--fg-1)'],
-                ['q', 'Quit',     'var(--red-dim)', 'var(--red)']].map(([v, l, bg, fg]) => (
+              {([
+                ['c', t('wizard.uploadContinue'), 'var(--blue)',     '#fff'],
+                ['s', t('wizard.uploadSkip'),     'var(--bg-card)', 'var(--fg-1)'],
+                ['q', t('wizard.uploadQuit'),     'var(--red-dim)', 'var(--red)'],
+              ] as [string, string, string, string][]).map(([v, label, bg, fg]) => (
                 <button
                   key={v}
                   onClick={() => respond(v)}
@@ -673,7 +687,7 @@ function UploadStep({ token, onClose }: { token: string; onClose: () => void; })
                     fontSize: 11, fontWeight: 600, cursor: 'pointer',
                     fontFamily: 'var(--font-display)',
                   }}
-                >({(v as string).toUpperCase()}) {l}</button>
+                >({v.toUpperCase()}) {label}</button>
               ))}
             </div>
           ) : (
@@ -699,7 +713,7 @@ function UploadStep({ token, onClose }: { token: string; onClose: () => void; })
                   fontSize: 11, fontWeight: 700, cursor: 'pointer',
                   fontFamily: 'var(--font-display)',
                 }}
-              >Send</button>
+              >{t('wizard.uploadSend')}</button>
             </div>
           )}
         </div>
@@ -717,7 +731,7 @@ function UploadStep({ token, onClose }: { token: string; onClose: () => void; })
             fontSize: 12, color: exitCode === 0 ? 'var(--green)' : 'var(--red)',
             fontFamily: 'var(--font-mono)',
           }}>
-            {exitCode === 0 ? '✓ Upload completed' : '✗ Upload failed'} · exit code {exitCode}
+            {exitCode === 0 ? t('wizard.uploadCompleted') : t('wizard.uploadFailed')} · {t('wizard.uploadExitCode')} {exitCode}
           </div>
           <button
             onClick={onClose}
@@ -728,7 +742,7 @@ function UploadStep({ token, onClose }: { token: string; onClose: () => void; })
               fontWeight: 700, cursor: 'pointer',
               fontFamily: 'var(--font-display)',
             }}
-          >Finish</button>
+          >{t('wizard.uploadFinish')}</button>
         </div>
       )}
     </div>

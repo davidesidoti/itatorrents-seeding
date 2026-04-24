@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, File as FileIcon, FolderOpen, RefreshCw, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api, openSSE } from '../api';
 import { FileBrowser } from '../components/FileBrowser';
 import { Toggle } from '../components/primitives';
@@ -9,6 +10,7 @@ type Mode = 'u' | 'f' | 'scan';
 interface Log { t: 'log' | 'ok' | 'warn' | 'err'; msg: string; }
 
 export function UploadModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   const [step, setStep] = useState(0);
   const [path, setPath] = useState('');
   const [mode, setMode] = useState<Mode>('u');
@@ -79,11 +81,25 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
     try { await api.post(`/api/upload/${job}/stdin`, { value }); } catch { /* */ }
   };
 
-  const steps = ['Path', 'Options', 'Upload'];
+  const steps = [t('upload.stepPath'), t('upload.stepOptions'), t('upload.stepUpload')];
   const logColors: Record<string, string> = {
     log: 'var(--blue-bright)', ok: 'var(--green)',
     warn: 'var(--yellow)', err: 'var(--red)',
   };
+
+  const modes = [
+    { id: 'u' as Mode, icon: FileIcon, label: '-u  file', desc: t('upload.modeFile') },
+    { id: 'f' as Mode, icon: FolderOpen, label: '-f  folder', desc: t('upload.modeFolder') },
+    { id: 'scan' as Mode, icon: RefreshCw, label: '-scan auto', desc: t('upload.modeRecursive') },
+  ];
+
+  const uploadOpts: [keyof typeof opts, string, string][] = [
+    ['screenshots', t('upload.optScreenshots'), 'Extract frames via ffmpeg'],
+    ['skipTmdb', t('upload.optSkipTmdb'), 'SKIP_TMDB'],
+    ['skipYoutube', t('upload.optSkipYoutube'), 'SKIP_YOUTUBE'],
+    ['anon', t('upload.optAnon'), 'Hide username (ANON)'],
+    ['webp', t('upload.optWebp'), 'WEBP_ENABLED'],
+  ];
 
   return (
     <div
@@ -111,7 +127,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
           <span style={{
             fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600,
             color: 'var(--fg-1)',
-          }}>New Upload</span>
+          }}>{t('upload.title')}</span>
           <button
             onClick={onClose}
             style={{
@@ -151,13 +167,9 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         <div style={{ padding: '16px 18px', overflowY: 'auto', flex: 1 }}>
           {step === 0 && (
             <>
-              <label style={labelStyle}>Upload Mode</label>
+              <label style={labelStyle}>{t('upload.modeLabel')}</label>
               <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-                {([
-                  { id: 'u', icon: FileIcon, label: '-u  file', desc: 'Single file' },
-                  { id: 'f', icon: FolderOpen, label: '-f  folder', desc: 'Full folder' },
-                  { id: 'scan', icon: RefreshCw, label: '-scan auto', desc: 'Recursive' },
-                ] as const).map((m) => {
+                {modes.map((m) => {
                   const Icon = m.icon;
                   const active = mode === m.id;
                   return (
@@ -188,10 +200,10 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
                 })}
               </div>
 
-              <label style={labelStyle}>Browse &amp; Select</label>
+              <label style={labelStyle}>{t('upload.browseLabel')}</label>
               <FileBrowser onSelect={setPath} />
 
-              <label style={labelStyle}>Selected Path</label>
+              <label style={labelStyle}>{t('upload.selectedPath')}</label>
               <input
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
@@ -199,7 +211,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
                 style={{ ...inputStyle, marginBottom: 10 }}
               />
 
-              <label style={labelStyle}>Target Tracker</label>
+              <label style={labelStyle}>{t('upload.targetTracker')}</label>
               <select
                 value={tracker}
                 onChange={(e) => setTracker(e.target.value)}
@@ -217,14 +229,8 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
 
           {step === 1 && (
             <>
-              <label style={labelStyle}>Upload Options</label>
-              {([
-                ['screenshots', 'Capture Screenshots', 'Extract frames via ffmpeg'],
-                ['skipTmdb', 'Skip TMDB Lookup', 'SKIP_TMDB'],
-                ['skipYoutube', 'Skip YouTube Trailer', 'SKIP_YOUTUBE'],
-                ['anon', 'Anonymous Upload', 'Hide username (ANON)'],
-                ['webp', 'WebP Screenshots', 'WEBP_ENABLED'],
-              ] as const).map(([k, l, s]) => (
+              <label style={labelStyle}>{t('upload.optionsLabel')}</label>
+              {uploadOpts.map(([k, l, s]) => (
                 <div key={k} style={{
                   display: 'flex', alignItems: 'center',
                   justifyContent: 'space-between', padding: '7px 0',
@@ -241,8 +247,8 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
                     }}>{s}</div>
                   </div>
                   <Toggle
-                    on={(opts as any)[k]}
-                    onToggle={() => setOpts((o) => ({ ...o, [k]: !(o as any)[k] }))}
+                    on={opts[k]}
+                    onToggle={() => setOpts((o) => ({ ...o, [k]: !o[k] }))}
                   />
                 </div>
               ))}
@@ -288,13 +294,15 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
                     color: 'var(--yellow)', marginBottom: 8,
                     display: 'flex', alignItems: 'center', gap: 6,
                   }}>
-                    <AlertCircle size={13} /> {prompt.text || 'Input required'}
+                    <AlertCircle size={13} /> {prompt.text || t('upload.inputRequired')}
                   </div>
                   {prompt.kind === 'duplicate' ? (
                     <div style={{ display: 'flex', gap: 6 }}>
-                      {[['c', 'Continue', 'var(--blue)'],
-                        ['s', 'Skip', 'var(--bg-card)'],
-                        ['q', 'Quit', 'var(--red-dim)']].map(([v, l, bg]) => (
+                      {([
+                        ['c', t('upload.promptContinue'), 'var(--blue)'],
+                        ['s', t('upload.promptSkip'), 'var(--bg-card)'],
+                        ['q', t('upload.promptQuit'), 'var(--red-dim)'],
+                      ] as [string, string, string][]).map(([v, l, bg]) => (
                         <button
                           key={v}
                           onClick={() => respondPrompt(v)}
@@ -306,7 +314,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
                             fontSize: 11, fontWeight: 600, cursor: 'pointer',
                             fontFamily: 'var(--font-display)',
                           }}
-                        >({(v as string).toUpperCase()}) {l}</button>
+                        >({v.toUpperCase()}) {l}</button>
                       ))}
                     </div>
                   ) : (
@@ -347,7 +355,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
                   color: exitCode === 0 ? 'var(--green)' : 'var(--red)',
                   fontFamily: 'var(--font-mono)', fontSize: 12,
                 }}>
-                  {exitCode === 0 ? '✓ Upload completed' : '✗ Upload failed'} · exit {exitCode}
+                  {exitCode === 0 ? t('upload.completed') : t('upload.failed')} · {t('upload.exit')} {exitCode}
                 </div>
               )}
             </>
@@ -366,7 +374,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
               fontWeight: 600, cursor: 'pointer', color: 'var(--fg-2)',
               fontFamily: 'var(--font-display)',
             }}
-          >{step === 0 ? 'Cancel' : '← Back'}</button>
+          >{step === 0 ? t('upload.cancel') : t('upload.back')}</button>
           <button
             disabled={step === 0 && !path || starting}
             onClick={() => {
@@ -382,9 +390,9 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
               color: '#fff', fontFamily: 'var(--font-display)',
             }}
           >
-            {step === 2 ? (done ? 'Done' : 'Waiting…')
-              : step === 1 ? (starting ? 'Starting…' : 'Start Upload →')
-                : 'Next →'}
+            {step === 2 ? (done ? t('upload.done') : t('upload.waiting'))
+              : step === 1 ? (starting ? t('upload.starting') : t('upload.startBtn'))
+                : t('upload.next')}
           </button>
         </div>
       </div>

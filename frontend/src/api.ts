@@ -19,10 +19,24 @@ export class ApiError extends Error {
   }
 }
 
+function currentLangHeader(): string {
+  try {
+    const raw = localStorage.getItem('u3d_lang');
+    const code = (raw || '').trim().toLowerCase().split(/[-_]/)[0];
+    return code === 'en' || code === 'it' ? code : 'it';
+  } catch {
+    return 'it';
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(apiUrl(path), {
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-U3DP-Lang': currentLangHeader(),
+      ...(init.headers || {}),
+    },
     ...init,
   });
   if (res.status === 401) {

@@ -13,11 +13,12 @@ import time
 from pathlib import Path
 from typing import Any, AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
+from ...i18n import get_request_lang, t
 from ...upload import stream_unit3dup
 from ..db import record_upload, update_exit_code
 from ..logbuf import emit as log_emit
@@ -50,12 +51,13 @@ class QuickBody(BaseModel):
 
 
 @router.post("/upload/quick")
-async def create(body: QuickBody):
+async def create(request: Request, body: QuickBody):
+    lang = get_request_lang(request)
     p = Path(body.path).resolve()
     if not p.exists():
-        raise HTTPException(404, "Path not found")
+        raise HTTPException(404, t("err.path_not_found", lang))
     if body.mode not in {"u", "f", "scan"}:
-        raise HTTPException(400, "Invalid mode")
+        raise HTTPException(400, t("err.invalid_mode", lang))
     args = ["-b"]
     flag = {"u": "-u", "f": "-f", "scan": "-scan"}[body.mode]
     args += [flag, str(p)]
@@ -67,10 +69,10 @@ async def create(body: QuickBody):
 
 
 @router.get("/upload/{job}/stream")
-async def stream(job: str):
+async def stream(request: Request, job: str):
     state = _jobs.get(job)
     if state is None:
-        raise HTTPException(404, "Job not found")
+        raise HTTPException(404, t("err.job_not_found", get_request_lang(request)))
     args: list[str] = state["args"]
     tmdb_id: str = state.get("tmdb_id", "")
     q: asyncio.Queue = asyncio.Queue()
@@ -112,12 +114,13 @@ class StdinBody(BaseModel):
 
 
 @router.post("/upload/{job}/stdin")
-async def stdin(job: str, body: StdinBody):
+async def stdin(request: Request, job: str, body: StdinBody):
+    lang = get_request_lang(request)
     state = _jobs.get(job)
     if state is None:
-        raise HTTPException(404, "Job not found")
+        raise HTTPException(404, t("err.job_not_found", lang))
     q: asyncio.Queue | None = state.get("stdin_queue")
     if q is None:
-        raise HTTPException(400, "No active process")
+        raise HTTPException(400, t("err.no_active_process", lang))
     await q.put((body.value or "0").strip() or "0")
     return JSONResponse({"ok": True})

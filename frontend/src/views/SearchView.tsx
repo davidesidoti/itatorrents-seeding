@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, ApiError } from '../api';
 import type { SearchResult } from '../types';
 
 export function SearchView() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [tracker, setTracker] = useState('ITT');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -42,13 +44,13 @@ export function SearchView() {
             color: 'var(--fg-1)', fontFamily: 'var(--font-display)',
           }}
         >
-          {['ITT', 'PTT', 'SIS'].map((t) => <option key={t}>{t}</option>)}
+          {['ITT', 'PTT', 'SIS'].map((tr) => <option key={tr}>{tr}</option>)}
         </select>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') run(); }}
-          placeholder="Search by title, TMDB ID, uploader…"
+          placeholder={t('search.placeholder')}
           style={{
             flex: 1, background: 'var(--bg-card)',
             border: '1px solid var(--border)', borderRadius: 6,
@@ -65,7 +67,7 @@ export function SearchView() {
             color: '#fff', cursor: 'pointer',
             fontFamily: 'var(--font-display)',
           }}
-        >{loading ? 'Searching…' : 'Search'}</button>
+        >{loading ? t('search.searching') : t('search.button')}</button>
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
@@ -82,7 +84,7 @@ export function SearchView() {
               border: '1px solid var(--border)',
               fontFamily: 'var(--font-display)',
             }}
-          >{f}</span>
+          >{f === 'All' ? t('search.filterAll') : f}</span>
         ))}
       </div>
 
@@ -143,7 +145,7 @@ export function SearchView() {
         <div style={{
           padding: 20, textAlign: 'center',
           color: 'var(--fg-3)', fontFamily: 'var(--font-display)',
-        }}>No results.</div>
+        }}>{t('search.noResults')}</div>
       )}
     </div>
   );

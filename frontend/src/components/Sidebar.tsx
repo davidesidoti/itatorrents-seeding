@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react';
 import {
   List, Library, CheckCircle, UploadCloud, Search, Settings, Terminal, LogOut, X,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import type { TrackerStatus, VersionInfo } from '../types';
 import { UpdateBanner } from './UpdateBanner';
 
-const NAV = [
-  { id: 'queue',    icon: List,         label: 'Queue' },
-  { id: 'library',  icon: Library,      label: 'Media Library' },
-  { id: 'uploaded', icon: CheckCircle,  label: 'Upload History' },
-  { id: 'upload',   icon: UploadCloud,  label: 'Quick Upload' },
-  { id: 'search',   icon: Search,       label: 'Search' },
-  { id: 'settings', icon: Settings,     label: 'Settings' },
-  { id: 'logs',     icon: Terminal,     label: 'Logs' },
+const NAV_ITEMS = [
+  { id: 'queue',    icon: List,         key: 'nav.queue' },
+  { id: 'library',  icon: Library,      key: 'nav.library' },
+  { id: 'uploaded', icon: CheckCircle,  key: 'nav.uploaded' },
+  { id: 'upload',   icon: UploadCloud,  key: 'nav.upload' },
+  { id: 'search',   icon: Search,       key: 'nav.search' },
+  { id: 'settings', icon: Settings,     key: 'nav.settings' },
+  { id: 'logs',     icon: Terminal,     key: 'nav.logs' },
 ] as const;
 
 interface Props {
@@ -30,6 +31,7 @@ export function Sidebar({
   activeView, setActiveView, isMobile, drawerOpen, onCloseDrawer,
   versionInfo, onUpdateCompleted,
 }: Props) {
+  const { t } = useTranslation();
   const [trackers, setTrackers] = useState<TrackerStatus[]>([
     { name: 'ITT', online: false },
     { name: 'PTT', online: false },
@@ -101,7 +103,7 @@ export function Sidebar({
         {isMobile && (
           <button
             onClick={onCloseDrawer}
-            aria-label="Close menu"
+            aria-label={t('nav.closeMenu')}
             style={{
               background: 'transparent', border: 'none', color: 'var(--fg-3)',
               cursor: 'pointer', padding: 6, display: 'flex',
@@ -112,7 +114,7 @@ export function Sidebar({
       </div>
 
       <nav style={{ padding: '12px 8px', flex: 1 }}>
-        {NAV.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = activeView === item.id;
           return (
@@ -145,7 +147,7 @@ export function Sidebar({
               }}
             >
               <Icon size={15} />
-              {item.label}
+              {t(item.key)}
             </div>
           );
         })}
@@ -160,22 +162,22 @@ export function Sidebar({
           fontSize: 10, fontWeight: 600, color: 'var(--fg-4)',
           letterSpacing: 'var(--tracking-wider)', textTransform: 'uppercase',
           fontFamily: 'var(--font-display)', marginBottom: 8,
-        }}>Trackers</div>
-        {trackers.map((t) => {
-          const unconfigured = t.configured === false;
-          const bg = unconfigured ? 'var(--border)' : t.online ? 'var(--green-dim)' : 'var(--red-dim)';
-          const fg = unconfigured ? 'var(--fg-4)' : t.online ? 'var(--green)' : 'var(--red)';
-          const dot = unconfigured ? 'var(--fg-4)' : t.online ? 'var(--green)' : 'var(--red)';
-          const label = unconfigured ? 'Not set' : t.online ? 'Online' : 'Offline';
+        }}>{t('nav.trackers')}</div>
+        {trackers.map((tr) => {
+          const unconfigured = tr.configured === false;
+          const bg = unconfigured ? 'var(--border)' : tr.online ? 'var(--green-dim)' : 'var(--red-dim)';
+          const fg = unconfigured ? 'var(--fg-4)' : tr.online ? 'var(--green)' : 'var(--red)';
+          const dot = unconfigured ? 'var(--fg-4)' : tr.online ? 'var(--green)' : 'var(--red)';
+          const label = unconfigured ? t('nav.notSet') : tr.online ? t('nav.online') : t('nav.offline');
           return (
-            <div key={t.name} style={{
+            <div key={tr.name} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               marginBottom: 6,
             }}>
               <span style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11,
                 color: unconfigured ? 'var(--fg-4)' : 'var(--fg-2)',
-              }}>{t.name}</span>
+              }}>{tr.name}</span>
               <span style={{
                 fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 9999,
                 background: bg, color: fg,
@@ -201,7 +203,7 @@ export function Sidebar({
             display: 'flex', alignItems: 'center', gap: 6,
             justifyContent: 'center',
           }}
-        ><LogOut size={12} /> Logout</button>
+        ><LogOut size={12} /> {t('nav.logout')}</button>
       </div>
     </div>
     </>

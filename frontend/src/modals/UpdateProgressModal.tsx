@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { openSSE } from '../api';
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 type Phase = 'running' | 'error' | 'done' | 'countdown';
 
 export function UpdateProgressModal({ target, onClose, onCompleted }: Props) {
+  const { t } = useTranslation();
   const [lines, setLines] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>('running');
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export function UpdateProgressModal({ target, onClose, onCompleted }: Props) {
         closeSSE.current?.();
         closeSSE.current = null;
         push('(stream closed)');
-        setError('connessione interrotta');
+        setError(t('update.connectionLost'));
         setPhaseSafe('error');
       },
     });
@@ -109,7 +111,7 @@ export function UpdateProgressModal({ target, onClose, onCompleted }: Props) {
     return () => window.clearInterval(iv);
   }, [phase, target, from, to]);
 
-  const title = target === 'app' ? 'Aggiornamento app' : 'Aggiornamento unit3dup';
+  const title = target === 'app' ? t('update.appTitle') : t('update.unit3dupTitle');
 
   return (
     <div
@@ -163,7 +165,7 @@ export function UpdateProgressModal({ target, onClose, onCompleted }: Props) {
           }}
         >
           {lines.length === 0 && (
-            <div style={{ color: 'var(--fg-4)' }}>avvio…</div>
+            <div style={{ color: 'var(--fg-4)' }}>{t('update.starting')}</div>
           )}
           {lines.map((l, i) => (
             <div key={i} style={{
@@ -184,7 +186,7 @@ export function UpdateProgressModal({ target, onClose, onCompleted }: Props) {
               {target === 'app' ? `app ${from} → ${to}` : `unit3dup ${from} → ${to}`}
             </div>
             <div style={{ fontSize: 20, fontWeight: 700 }}>
-              Refresh automatico in {count}…
+              {t('update.autoRefreshIn')} {count}…
             </div>
           </div>
         )}
@@ -201,7 +203,7 @@ export function UpdateProgressModal({ target, onClose, onCompleted }: Props) {
                 cursor: 'pointer', fontFamily: 'var(--font-display)',
                 fontSize: 12, fontWeight: 600,
               }}
-            >Chiudi</button>
+            >{t('update.close')}</button>
           </div>
         )}
       </div>

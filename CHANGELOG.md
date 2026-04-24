@@ -8,6 +8,18 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.0] - 2026-04-24
+
+### Added
+- **Supporto multilingua UI (IT / EN)**: switcher rapido `IT|EN` nella topbar (sempre visibile) e nuova sezione **Interface** in Impostazioni. La preferenza è persistita in `Unit3Dbot.json` (`U3DP_LANG`) e in `localStorage` (`u3d_lang`), sopravvive a refresh e restart del service.
+- **API backend localizzata**: i messaggi d'errore delle route `/api/*` ora rispettano la lingua della richiesta. Il frontend invia l'header `X-U3DP-Lang: it|en` su ogni chiamata; il backend, in assenza di header, ricade sul setting runtime `U3DP_LANG` (default `it`).
+- Tutte le viste e i modali ora completamente tradotti: Libreria Media, Coda Torrent, Cronologia Upload, Ricerca, Upload Rapido (UploadModal), Log, Impostazioni (nav sezioni + pulsanti salva), Wizard upload (tutti e 5 gli step), tutte le descrizioni e i toggle delle sezioni Impostazioni.
+
+### Changed
+- Default lingua: **italiano** (invariato per gli utenti esistenti). Nuove installazioni partono in IT; lo switch a EN è manuale dalla UI.
+
+---
+
 ## [0.5.1] - 2026-04-24
 
 ### Added

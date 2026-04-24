@@ -158,6 +158,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "U3DP_PORT": "8765",
     "U3DP_HTTPS_ONLY": False,
     "U3DP_SYSTEMD_UNIT": "",
+    "U3DP_LANG": "it",
 
     # Wizard Defaults — control default UI behaviour of the upload wizard.
     "W_AUDIO_CHECK": True,
