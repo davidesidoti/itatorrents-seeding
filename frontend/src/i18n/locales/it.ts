@@ -306,6 +306,8 @@ export const it: Catalog = {
     tmdbApply: 'Applica ID',
     tmdbCurrent: 'ATTUALE',
     episodesUploaded: '{{done}}/{{total}} episodi caricati',
+    episodeFallback: 'Episodio {{n}}',
+    toggleSeason: 'Espandi/comprimi stagione',
     empty: 'vuoto',
     cached: 'cached',
     bulkSelect: 'Selezione multipla',

@@ -878,7 +878,20 @@ function DetailPanel({
                 }}
               >{t('library.uploadAllSeasons')}</button>
             }/>
-            {item.seasons.map((s) => <SeasonRow key={s.number} season={s} item={item} category={category} onStart={onStart} onMarked={onMarked} />)}
+            {(() => {
+              const firstOpenIdx = item.seasons.findIndex((s) => !s.already_uploaded);
+              return item.seasons.map((s, idx) => (
+                <SeasonRow
+                  key={s.number}
+                  season={s}
+                  item={item}
+                  category={category}
+                  onStart={onStart}
+                  onMarked={onMarked}
+                  defaultOpen={idx === firstOpenIdx}
+                />
+              ));
+            })()}
             {!item.all_seasons_uploaded && (
               <MarkUploadedBtn
                 category={category}
@@ -921,27 +934,66 @@ function DetailPanel({
   );
 }
 
+function parseEpisode(filename: string, seriesName: string): { num: string; title: string } {
+  const stem = filename.replace(/\.[^.]+$/, '');
+  const m = stem.match(/[Ss](\d{1,2})[Ee](\d{1,3})/);
+  const num = m ? `E${m[2].padStart(2, '0')}` : '';
+  let rest = stem;
+  if (m && m.index !== undefined) rest = stem.slice(m.index + m[0].length);
+  rest = rest.replace(/^[\s._-]+/, '');
+  rest = rest.split(/\b(1080p|720p|2160p|480p|WEB-?DL|WEBRip|BluRay|HDTV|x264|x265|H\.?264|H\.?265|HEVC|AAC|DDP?5\.1|DTS|AMZN|NF|HMAX|DSNP|ITA|ENG|MULTi)\b/i)[0];
+  rest = rest.replace(/[._]+/g, ' ').replace(/\s+/g, ' ').trim();
+  rest = rest.replace(/[\s-]+$/, '');
+  const seriesLower = seriesName.toLowerCase();
+  if (seriesName && rest.toLowerCase().startsWith(seriesLower)) {
+    rest = rest.slice(seriesName.length).replace(/^[\s-]+/, '');
+  }
+  return { num, title: rest };
+}
+
 function SeasonRow({
-  season, item, category, onStart, onMarked,
+  season, item, category, onStart, onMarked, defaultOpen,
 }: {
   season: Season;
   item: LibraryItem;
   category: Category;
   onStart: (kind: 'movie' | 'series' | 'episode', path: string, season?: Season) => void;
   onMarked?: () => void;
+  defaultOpen?: boolean;
 }) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const pct = Math.round((season.uploaded_episodes / Math.max(1, season.episode_count)) * 100);
+  const canToggle = !season.already_uploaded;
   return (
     <div style={{
       padding: '8px 10px', background: 'var(--bg-card)',
       borderRadius: 6, border: '1px solid var(--border)', marginBottom: 6,
     }}>
-      <div style={{
-        display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', marginBottom: 5,
-      }}>
-        <div>
+      <div
+        onClick={() => { if (canToggle) setOpen((v) => !v); }}
+        role={canToggle ? 'button' : undefined}
+        aria-expanded={canToggle ? open : undefined}
+        aria-label={canToggle ? t('library.toggleSeason') : undefined}
+        style={{
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', marginBottom: 5,
+          cursor: canToggle ? 'pointer' : 'default',
+          userSelect: 'none',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {canToggle && (
+            <ChevronDown
+              size={14}
+              style={{
+                color: 'var(--fg-3)',
+                transition: 'transform 0.15s ease',
+                transform: open ? 'rotate(0deg)' : 'rotate(-90deg)',
+              }}
+            />
+          )}
           <span style={{
             fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 600,
             color: 'var(--fg-1)',
@@ -950,7 +1002,7 @@ function SeasonRow({
             <span style={{ marginLeft: 6 }}><Badge>uploaded ✓</Badge></span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
           {!season.already_uploaded && (
             <>
               <button
@@ -998,36 +1050,66 @@ function SeasonRow({
           }}>{t('library.episodesUploaded', { done: season.uploaded_episodes, total: season.episode_count })}</div>
         </>
       )}
-      {!season.already_uploaded && (
-        <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {season.video_files.map((vf) => (
-            <div key={vf.path} style={{ display: 'inline-flex', gap: 2 }}>
-              <button
-                disabled={vf.uploaded}
+      {!season.already_uploaded && open && (
+        <div style={{
+          marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2,
+          animation: 'u3d-fade-in 0.18s ease',
+        }}>
+          {season.video_files.map((vf, idx) => {
+            const { num, title } = parseEpisode(vf.name, item.name);
+            const fallback = num
+              ? t('library.episodeFallback', { n: parseInt(num.slice(1), 10) })
+              : vf.name.replace(/\.[^.]+$/, '');
+            const display = title || fallback;
+            const isHover = hoverIdx === idx && !vf.uploaded;
+            return (
+              <div
+                key={vf.path}
+                onMouseEnter={() => setHoverIdx(idx)}
+                onMouseLeave={() => setHoverIdx(null)}
                 onClick={() => !vf.uploaded && onStart('episode', vf.path, season)}
                 style={{
-                  background: 'var(--bg-base)',
-                  border: '1px solid var(--border)',
-                  borderRadius: vf.uploaded ? 4 : '4px 0 0 4px',
-                  borderRight: vf.uploaded ? '1px solid var(--border)' : 'none',
-                  padding: '2px 5px', fontSize: 9, fontWeight: 600,
-                  color: vf.uploaded ? 'var(--green)' : 'var(--fg-2)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 8px', borderRadius: 4,
+                  background: isHover ? 'var(--bg-base)' : 'transparent',
                   cursor: vf.uploaded ? 'default' : 'pointer',
-                  fontFamily: 'var(--font-display)',
-                  opacity: vf.uploaded ? 0.4 : 1,
+                  opacity: vf.uploaded ? 0.55 : 1,
+                  transition: 'background 0.12s ease',
                 }}
-              >{vf.uploaded ? '✓ ' : ''}{vf.name.replace(/\.[^.]+$/, '').slice(0, 14)}</button>
-              {!vf.uploaded && (
-                <MarkUploadedBtn
-                  category={category}
-                  name={item.name}
-                  episodePath={vf.path}
-                  variant="chip"
-                  onMarked={onMarked}
-                />
-              )}
-            </div>
-          ))}
+              >
+                <span style={{
+                  fontSize: 11, width: 14, textAlign: 'center',
+                  color: vf.uploaded ? 'var(--green)' : 'var(--fg-3)',
+                }}>{vf.uploaded ? '✓' : '·'}</span>
+                {num && (
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700,
+                    color: vf.uploaded ? 'var(--green)' : 'var(--blue)',
+                    minWidth: 28,
+                  }}>{num}</span>
+                )}
+                <span
+                  title={vf.name}
+                  style={{
+                    flex: 1, fontFamily: 'var(--font-display)', fontSize: 12,
+                    color: 'var(--fg-1)',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}
+                >{num ? ' - ' : ''}{display}</span>
+                {!vf.uploaded && (
+                  <span onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
+                    <MarkUploadedBtn
+                      category={category}
+                      name={item.name}
+                      episodePath={vf.path}
+                      variant="chip"
+                      onMarked={onMarked}
+                    />
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

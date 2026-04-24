@@ -304,6 +304,8 @@ export const en = {
     tmdbApply: 'Apply ID',
     tmdbCurrent: 'CURRENT',
     episodesUploaded: '{{done}}/{{total}} episodes uploaded',
+    episodeFallback: 'Episode {{n}}',
+    toggleSeason: 'Toggle season',
     empty: 'empty',
     cached: 'cached',
     bulkSelect: 'Select multiple',

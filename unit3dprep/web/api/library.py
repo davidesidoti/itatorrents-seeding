@@ -101,7 +101,40 @@ def _item_to_dict(item: MediaItem, uploaded_paths: set[str]) -> dict[str, Any]:
 
 async def _enrich_items(items: list[MediaItem]) -> tuple[set[str], dict, dict]:
     uploads = await list_uploads()
-    uploaded_paths = {r["source_path"] for r in uploads}
+    uploaded_paths = {r["source_path"] for r in uploads if r.get("source_path")}
+
+    # Fallback: records with empty source_path → match via hardlink inode
+    seeding_inodes: set[tuple[int, int]] = set()
+    for r in uploads:
+        sp = r.get("seeding_path", "")
+        if sp and not sp.startswith("__manual__"):
+            try:
+                st = Path(sp).stat()
+                if st.st_ino:
+                    seeding_inodes.add((st.st_dev, st.st_ino))
+            except OSError:
+                pass
+    if seeding_inodes:
+        for item in items:
+            if item.kind == "movie":
+                for vf in item.video_files:
+                    try:
+                        st = vf.stat()
+                        if st.st_ino and (st.st_dev, st.st_ino) in seeding_inodes:
+                            uploaded_paths.add(str(item.path.resolve()))
+                            uploaded_paths.add(str(vf.resolve()))
+                    except OSError:
+                        pass
+            else:
+                for season in item.seasons:
+                    for vf in season.video_files:
+                        try:
+                            st = vf.stat()
+                            if st.st_ino and (st.st_dev, st.st_ino) in seeding_inodes:
+                                uploaded_paths.add(str(vf.resolve()))
+                                uploaded_paths.add(str(season.path.resolve()))
+                        except OSError:
+                            pass
     all_paths: list[str] = []
     for item in items:
         all_paths.append(str(item.path))

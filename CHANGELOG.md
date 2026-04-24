@@ -8,6 +8,16 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.3] - 2026-04-24
+
+### Changed
+- **Media Library — Pannello dettaglio serie: stagioni come accordion + episodi in lista**. Le stagioni ora sono collassabili (prima stagione non caricata aperta di default) e gli episodi, invece che piccoli badge troncati, appaiono in una lista verticale con il numero episodio (`E01`) prima del titolo, pulito da prefisso serie ed etichette di release (`1080p`, codec, gruppo, ecc.). Il nome completo resta leggibile; hover+click sulla riga avvia comunque il wizard upload, il chip "Segna come caricato" funziona senza chiudere la sezione.
+
+### Fixed
+- **Media Library: film non nascosto dopo upload con skip duplicato**. Se il record in upload history aveva `source_path` vuoto (per upsert su record stantio), il film restava visibile anche con "nascondi caricati" attivo. Doppia correzione: (1) l'upsert in DB ora aggiorna `source_path` (e altri campi arricchiti) se il nuovo valore è non vuoto; (2) la Media Library usa un fallback inode-based — se un video file dell'item condivide l'inode con un file in seedings nel DB, l'item viene marcato come caricato anche quando `source_path` è vuoto.
+
+---
+
 ## [0.6.2] - 2026-04-24
 
 ### Fixed

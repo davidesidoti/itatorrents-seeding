@@ -64,6 +64,16 @@ def _record_upload_sync(
                 r["unit3dup_exit_code"] = exit_code
                 r["uploaded_at"] = _now_iso()
                 r["hardlink_only"] = hardlink_only
+                if source_path:
+                    r["source_path"] = source_path
+                if tmdb_id:
+                    r["tmdb_id"] = tmdb_id
+                if title:
+                    r["title"] = title
+                if year:
+                    r["year"] = year
+                if final_name:
+                    r["final_name"] = final_name
                 _save(records)
                 return
         next_id = max((r.get("id", 0) for r in records), default=0) + 1
