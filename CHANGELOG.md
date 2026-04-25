@@ -8,6 +8,13 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.4] - 2026-04-25
+
+### Added
+- **Impostazioni — sezione "Versione"**: mostra la versione corrente e l'ultima disponibile di app e unit3dup in due card separate. Ogni card ha un pulsante "Controlla aggiornamenti" per forzare il check senza aspettare i 10 minuti del polling automatico, un pulsante "Installa aggiornamento" (visibile solo se disponibile) e un accordion **Changelog** che mostra le release notes da GitHub (app) o un link a PyPI (unit3dup). La card unit3dup appare anche quando il pacchetto non è installato localmente, mostrando l'ultima versione disponibile e un pulsante di installazione.
+
+---
+
 ## [0.6.3] - 2026-04-24
 
 ### Changed

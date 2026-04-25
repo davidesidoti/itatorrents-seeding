@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import {
   Activity, HardDrive, Sliders, Image as ImageIcon, Folder as FolderIcon,
-  GitBranch, Terminal, CheckCircle, Languages,
+  GitBranch, Terminal, CheckCircle, Languages, Tag,
+  RefreshCw, ChevronDown, ExternalLink, Box, Package,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api';
 import { LangSwitcher } from '../components/LangSwitcher';
 import { Toggle, GROUP_LABEL, LABEL_CSS } from '../components/primitives';
+import { UpdateProgressModal } from '../modals/UpdateProgressModal';
+import type { VersionInfo } from '../types';
 
-type Section = 'tracker' | 'client' | 'prefs' | 'imghost' | 'paths' | 'seeding' | 'console' | 'interface';
+type Section = 'tracker' | 'client' | 'prefs' | 'imghost' | 'paths' | 'seeding' | 'version' | 'console' | 'interface';
 
 const SECTIONS: { id: Section; labelKey: string; icon: any }[] = [
   { id: 'tracker',  labelKey: 'settings.navTracker',  icon: Activity },
@@ -17,6 +20,7 @@ const SECTIONS: { id: Section; labelKey: string; icon: any }[] = [
   { id: 'imghost',  labelKey: 'settings.navImghost',  icon: ImageIcon },
   { id: 'paths',    labelKey: 'settings.navPaths',    icon: FolderIcon },
   { id: 'seeding',  labelKey: 'settings.navSeeding',  icon: GitBranch },
+  { id: 'version',  labelKey: 'settings.navVersion',  icon: Tag },
   { id: 'interface',labelKey: 'settings.navInterface',icon: Languages },
   { id: 'console',  labelKey: 'settings.navConsole',  icon: Terminal },
 ];
@@ -123,6 +127,7 @@ export function SettingsView({ isMobile }: { isMobile?: boolean } = {}) {
           {section === 'imghost' && <ImageHostsSection cfg={cfg} set={set} />}
           {section === 'paths' && <PathsSection cfg={cfg} set={set} isMobile={isMobile} />}
           {section === 'seeding' && <SeedingSection cfg={cfg} set={set} env={data.env} isMobile={isMobile} />}
+          {section === 'version' && <VersionSection />}
           {section === 'interface' && <InterfaceSection />}
           {section === 'console' && <ConsoleSection cfg={cfg} set={set} />}
         </div>
@@ -161,6 +166,305 @@ export function SettingsView({ isMobile }: { isMobile?: boolean } = {}) {
 }
 
 // -------------------------------------------------------------------- Helpers
+
+function VersionSection() {
+  const { t } = useTranslation();
+  const [info, setInfo] = useState<VersionInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState<'app' | 'unit3dup' | null>(null);
+  const [appCLOpen, setAppCLOpen] = useState(false);
+  const [botCLOpen, setBotCLOpen] = useState(false);
+  const [appRelease, setAppRelease] = useState<{
+    body: string; html_url?: string; name?: string;
+  } | null>(null);
+  const [appCLLoading, setAppCLLoading] = useState(false);
+  const [updating, setUpdating] = useState<'app' | 'unit3dup' | null>(null);
+
+  useEffect(() => {
+    api.get<VersionInfo>('/api/version/info')
+      .then(setInfo)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const check = async (target: 'app' | 'unit3dup') => {
+    setChecking(target);
+    try {
+      const fresh = await api.post<VersionInfo>('/api/version/refresh');
+      setInfo(fresh);
+    } catch { /* noop */ }
+    setChecking(null);
+  };
+
+  const openAppCL = async () => {
+    const next = !appCLOpen;
+    setAppCLOpen(next);
+    if (next && !appRelease && !appCLLoading && info?.app?.current) {
+      setAppCLLoading(true);
+      try {
+        const r = await api.get<{ body: string; html_url?: string; name?: string }>(
+          `/api/version/changelog?v=${encodeURIComponent(info.app.current)}`,
+        );
+        setAppRelease(r);
+      } catch { /* noop */ }
+      setAppCLLoading(false);
+    }
+  };
+
+  if (loading) return (
+    <div style={{ padding: 8, color: 'var(--fg-4)', fontFamily: 'var(--font-display)', fontSize: 12 }}>
+      {t('common.loading')}
+    </div>
+  );
+
+  const card: React.CSSProperties = {
+    background: 'var(--bg-card)', border: '1px solid var(--border)',
+    borderRadius: 8, marginBottom: 20, overflow: 'hidden',
+  };
+
+  const pill = (v: string | null | undefined, hi?: boolean) => (
+    <span style={{
+      fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600,
+      padding: '2px 8px', borderRadius: 4,
+      background: hi ? 'var(--blue-muted)' : 'var(--bg-surface)',
+      color: hi ? 'var(--blue-bright)' : 'var(--fg-2)',
+      border: `1px solid ${hi ? 'rgba(59,130,246,0.35)' : 'var(--border)'}`,
+    }}>{v ?? '–'}</span>
+  );
+
+  const refreshBtn = (target: 'app' | 'unit3dup') => (
+    <button
+      onClick={() => check(target)}
+      disabled={!!checking}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        background: 'var(--bg-surface)', border: '1px solid var(--border)',
+        borderRadius: 6, padding: '5px 10px',
+        cursor: checking ? 'default' : 'pointer',
+        fontFamily: 'var(--font-display)', fontSize: 11, color: 'var(--fg-3)',
+        opacity: checking && checking !== target ? 0.5 : 1,
+      }}
+    >
+      <RefreshCw size={11} style={checking === target ? { animation: 'spin 1s linear infinite' } : {}} />
+      {checking === target ? t('settings.versionChecking') : t('settings.versionCheckUpdates')}
+    </button>
+  );
+
+  const clTrigger = (open: boolean, onClick: () => void, ver?: string | null) => (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '8px 14px', cursor: 'pointer',
+        fontSize: 11, fontFamily: 'var(--font-display)', color: 'var(--fg-3)',
+        userSelect: 'none' as const,
+      }}
+    >
+      <ChevronDown size={12} style={{ transform: open ? '' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+      {t('settings.versionChangelog')}
+      {ver && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>v{ver}</span>}
+    </div>
+  );
+
+  const statusBadge = (newer?: boolean) => (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      fontSize: 11, fontFamily: 'var(--font-display)', fontWeight: 600,
+      color: newer ? 'var(--blue-bright)' : 'var(--green)',
+    }}>
+      {!newer && <CheckCircle size={11} />}
+      {newer ? t('settings.versionUpdateAvailable') : t('settings.versionUpToDate')}
+    </span>
+  );
+
+  return (
+    <>
+      <div style={{ ...GROUP_LABEL, marginTop: 0 }}>{t('settings.versionAppGroup')}</div>
+
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--fg-4)', fontFamily: 'var(--font-display)', marginBottom: 4 }}>
+              {t('settings.versionCurrent')}
+            </div>
+            {pill(info?.app?.current)}
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--fg-4)', fontFamily: 'var(--font-display)', marginBottom: 4 }}>
+              {t('settings.versionLatest')}
+            </div>
+            {pill(info?.app?.latest, info?.app?.newer)}
+          </div>
+          {info?.app && statusBadge(info.app.newer)}
+          <div style={{ marginLeft: 'auto' }}>{refreshBtn('app')}</div>
+        </div>
+
+        {info?.app?.newer && (
+          <div style={{ padding: '0 14px 12px' }}>
+            <button
+              onClick={() => info.can_update_app && setUpdating('app')}
+              disabled={!info.can_update_app}
+              title={!info.can_update_app ? t('settings.versionNoSystemd') : undefined}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: info.can_update_app ? 'var(--blue-muted)' : 'transparent',
+                border: `1px solid ${info.can_update_app ? 'rgba(59,130,246,0.35)' : 'var(--border)'}`,
+                borderRadius: 6, padding: '6px 14px',
+                color: info.can_update_app ? 'var(--blue-bright)' : 'var(--fg-4)',
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600,
+                cursor: info.can_update_app ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <Box size={12} />
+              {t('settings.versionInstall')}
+              {info.app.latest && (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>→ {info.app.latest}</span>
+              )}
+            </button>
+            {!info.can_update_app && (
+              <div style={{ marginTop: 4, fontSize: 10, color: 'var(--fg-4)', fontFamily: 'var(--font-display)' }}>
+                {t('settings.versionNoSystemd')}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          {clTrigger(appCLOpen, openAppCL, info?.app?.current)}
+          {appCLOpen && (
+            <div style={{ padding: '4px 14px 14px', borderTop: '1px solid var(--border-subtle)' }}>
+              {appCLLoading && (
+                <div style={{ color: 'var(--fg-4)', fontSize: 11, fontFamily: 'var(--font-display)', paddingTop: 6 }}>
+                  {t('changelog.loading')}
+                </div>
+              )}
+              {!appCLLoading && appRelease && (
+                <>
+                  {appRelease.name && (
+                    <div style={{
+                      fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700,
+                      color: 'var(--fg-1)', margin: '8px 0 4px',
+                    }}>{appRelease.name}</div>
+                  )}
+                  <pre style={{
+                    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    margin: '8px 0 0', fontFamily: 'var(--font-mono)',
+                    fontSize: 11, color: 'var(--fg-2)', lineHeight: 1.6,
+                  }}>
+                    {appRelease.body || t('changelog.noNotes')}
+                  </pre>
+                  {appRelease.html_url && (
+                    <a
+                      href={appRelease.html_url}
+                      target="_blank" rel="noreferrer"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        marginTop: 10, color: 'var(--blue-bright)',
+                        fontFamily: 'var(--font-display)', fontSize: 11,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      <ExternalLink size={11} /> {t('changelog.openOnGithub')}
+                    </a>
+                  )}
+                </>
+              )}
+              {!appCLLoading && !appRelease && (
+                <div style={{ color: 'var(--fg-4)', fontSize: 11, fontFamily: 'var(--font-display)', paddingTop: 6 }}>
+                  {t('changelog.unavailable')}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={GROUP_LABEL}>{t('settings.versionBotGroup')}</div>
+
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--fg-4)', fontFamily: 'var(--font-display)', marginBottom: 4 }}>
+              {t('settings.versionCurrent')}
+            </div>
+            {pill(info?.unit3dup?.current)}
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--fg-4)', fontFamily: 'var(--font-display)', marginBottom: 4 }}>
+              {t('settings.versionLatest')}
+            </div>
+            {pill(info?.unit3dup?.latest, info?.unit3dup?.newer)}
+          </div>
+          {info?.unit3dup && (
+            info.unit3dup.installed
+              ? statusBadge(info.unit3dup.newer)
+              : <span style={{ fontSize: 11, fontFamily: 'var(--font-display)', color: 'var(--fg-4)' }}>
+                  {t('settings.versionNotInstalled')}
+                </span>
+          )}
+          <div style={{ marginLeft: 'auto' }}>{refreshBtn('unit3dup')}</div>
+        </div>
+
+        {(info?.unit3dup?.newer || (!info?.unit3dup?.installed && !!info?.unit3dup?.latest)) && (
+          <div style={{ padding: '0 14px 12px' }}>
+            <button
+              onClick={() => setUpdating('unit3dup')}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                background: 'var(--blue-muted)',
+                border: '1px solid rgba(59,130,246,0.35)',
+                borderRadius: 6, padding: '6px 14px',
+                color: 'var(--blue-bright)',
+                fontFamily: 'var(--font-display)', fontSize: 11, fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Package size={12} />
+              {t('settings.versionInstall')}
+              {info?.unit3dup?.latest && (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>→ {info.unit3dup.latest}</span>
+              )}
+            </button>
+          </div>
+        )}
+
+        <div style={{ borderTop: '1px solid var(--border-subtle)' }}>
+          {clTrigger(botCLOpen, () => setBotCLOpen((v) => !v), info?.unit3dup?.current ?? info?.unit3dup?.latest)}
+          {botCLOpen && (
+            <div style={{
+              padding: '10px 14px 14px', borderTop: '1px solid var(--border-subtle)',
+              fontSize: 11, fontFamily: 'var(--font-display)', color: 'var(--fg-3)', lineHeight: 1.6,
+            }}>
+              {info?.unit3dup?.installed && info?.unit3dup?.current && (
+                <>{t('changelog.unit3dupUpdatedTo')}{' '}
+                <b style={{ fontFamily: 'var(--font-mono)' }}>{info.unit3dup.current}</b>.{' '}</>
+              )}
+              {t('changelog.seePyPI')}.{' '}
+              <a
+                href="https://pypi.org/project/unit3dup/"
+                target="_blank" rel="noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  color: 'var(--blue-bright)', textDecoration: 'none',
+                }}
+              >
+                <ExternalLink size={11} /> PyPI
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {updating && (
+        <UpdateProgressModal
+          target={updating}
+          onClose={() => setUpdating(null)}
+          onCompleted={() => setUpdating(null)}
+        />
+      )}
+    </>
+  );
+}
 
 function InterfaceSection() {
   const { t } = useTranslation();
