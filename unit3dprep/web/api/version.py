@@ -3,7 +3,7 @@
 - /api/version/info          → cached {app, webup} current/latest/newer
 - /api/version/refresh       → force-refresh cache
 - /api/version/changelog     → GitHub release body for a given app version
-- /api/version/update/webup/stream      → SSE: git pull + pip install -r requirements.txt + systemctl restart unit3dwebup.service
+- /api/version/update/webup/stream      → SSE: git pull + pip install --upgrade Unit3DwebUp + systemctl restart unit3dwebup.service
 - /api/version/update/app/stream        → SSE: git pull + pip install -e . + systemctl restart
 
 Current app version: importlib.metadata (authoritative) with pyproject fallback.
@@ -386,7 +386,7 @@ async def update_webup():
 
         py = _webup_python()
         async for ev in _stream_subprocess(
-            [py, "-m", "pip", "install", "-r", "requirements.txt"], cwd=repo
+            [py, "-m", "pip", "install", "--upgrade", "Unit3DwebUp"], cwd=repo
         ):
             if ev["event"] == "exit":
                 if json.loads(ev["data"])["code"] != 0:

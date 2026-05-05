@@ -11,7 +11,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - **Migrazione bot: da `unit3dup` CLI a `Unit3DWebUp` FastAPI**. L'app ora invoca il nuovo bot via HTTP API anziché spawnare il CLI come subprocess. Il pre-flight (audio check + nomenclatura ItaTorrents + hardlink in `~/seedings/`) resta invariato; cambia solo l'ultimo step (upload) che ora chiama `/setenv`+`/scan`+`/maketorrent`+`/upload`+`/seed` su `Unit3DWebUp` e ascolta i progressi via WebSocket. Niente più PTY streaming né parsing regex degli stdout.
 - **Configurazione condivisa**: salvando da Settings UI, l'app sincronizza automaticamente le chiavi rilevanti di `Unit3Dbot.json` (tracker, qBittorrent, image hosts, preferences) verso il `.env` di `Unit3DWebUp` via `POST /setenv`. Single source of truth: la nostra UI.
 - **Settings UI**: nuova card "Unit3DWebUp" con stato online/offline, versione, latenza, indicatore WebSocket, pulsanti "Aggiorna" e "Spingi config".
-- **Versione**: la sezione che prima mostrava `unit3dup` (PyPI) ora mostra `Unit3DWebUp` (GitHub). Update flow via `git pull` + `pip install -r requirements.txt` + `systemctl --user restart unit3dwebup.service`.
+- **Versione**: la sezione che prima mostrava `unit3dup` (PyPI) ora mostra `Unit3DWebUp` (GitHub). Update flow via `git pull` + `pip install --upgrade Unit3DwebUp` (PyPI) + `systemctl --user restart unit3dwebup.service`.
 
 ### Added
 - Nuovi endpoint `/api/webup/health`, `/api/webup/sync`, `/api/webup/setting`, `/api/webup/filter` per integrarsi con il nuovo bot.
@@ -24,6 +24,7 @@ Versioning: [Semantic Versioning](https://semver.org/).
 - Endpoint `/api/version/update/unit3dup/stream` (rimpiazzato da `/api/version/update/webup/stream`).
 
 ### Fixed
+- **Update Unit3DWebUp: `requirements.txt` non esiste più**. Il branch `0.0.x` di `Unit3DWebUp` non distribuisce più `requirements.txt`; l'install canonico è via PyPI (`pip install Unit3DwebUp`). Il pulsante "Installa aggiornamento" falliva con `Could not open requirements file`. Ora l'update esegue `pip install --upgrade Unit3DwebUp` invece di `pip install -r requirements.txt`.
 - **Bridge config: chiavi vuote rompevano webup**. La sync verso `Unit3DWebUp` `.env` pushava valori vuoti per chiavi tipo `TORRENT__SHARED_QBIT_PATH=`, `PREFS__RELEASER_SIGN=`, ecc. Il validator Pydantic di webup (`empty_to_none`) le convertiva in `None`, faceva fallire la validazione `str` e `get_settings()` chiamava `SystemExit(1)` → tutte le richieste successive (incluso `setenv` chiamato dal wizard upload) ritornavano 500. Ora `_to_webup_env_payload` salta valori vuoti, `None`, `no_key`/`no_pass`/`no_path`/`no_comment`: webup mantiene i suoi default.
 - **Wizard upload bloccato sul maketorrent**. L'orchestrator aspettava un `posterLogMessage` testuale "torrent created/exists" che webup non manda mai (manda invece `[New torrent] FILE - 100.0`). Refactor: HTTP 200 di `/maketorrent` = completion; drena log buffered per ~1.5s e prosegue. Stesso pattern per `/upload` con detection di terminal success/failure dai log post-call.
 - **Wizard upload: `no Media for ... (0 items)`**. Per le serie passavamo `SCAN_PATH = <folder serie>` → webup vedeva singoli episodi non il pack. Fix: per `kind=series`, `SCAN_PATH=parent(seeding_path)`, match_path = la folder. Webup riconosce le subfolders come Media-pack.
