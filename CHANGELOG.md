@@ -6,6 +6,30 @@ Versioning: [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Storage impostazioni unificato in un singolo file `.env`** (compatibile con `Unit3DWebUp` 0.0.20+). Le impostazioni dell'app e quelle del bot vivono ora nello stesso file, eliminando il vecchio `Unit3Dbot.json`. Default: `~/.config/unit3dprep/.env`. Override: `U3DP_ENV_PATH=<file>` o `ENVPATH=<directory>` (la stessa variabile usata da `Unit3DWebUp`, così il valore può essere riutilizzato nel suo systemd/docker-compose). Migration automatica al primo avvio: se esiste `~/Unit3Dup_config/Unit3Dbot.json` (o quanto puntato da `$UNIT3DUP_CONFIG`) viene letto, riscritto come `.env` con la nomenclatura canonica `TRACKER__*` / `TORRENT__*` / `PREFS__*`, e rinominato in `Unit3Dbot.json.migrated-bak` (mai cancellato — l'utente decide quando eliminarlo). Nessun cambio per l'utente che usa la UI: la API `/api/settings` mantiene lo stesso shape (chiavi corte storiche), e `webup_envpath_dir` viene esposto nel payload per ricordare quale path passare a webup.
+- **Migrazione bot: da `unit3dup` CLI a `Unit3DWebUp` FastAPI**. L'app ora invoca il nuovo bot via HTTP API anziché spawnare il CLI come subprocess. Il pre-flight (audio check + nomenclatura ItaTorrents + hardlink in `~/seedings/`) resta invariato; cambia solo l'ultimo step (upload) che ora chiama `/setenv`+`/scan`+`/maketorrent`+`/upload`+`/seed` su `Unit3DWebUp` e ascolta i progressi via WebSocket. Niente più PTY streaming né parsing regex degli stdout.
+- **Configurazione condivisa**: salvando da Settings UI, l'app sincronizza automaticamente le chiavi rilevanti di `Unit3Dbot.json` (tracker, qBittorrent, image hosts, preferences) verso il `.env` di `Unit3DWebUp` via `POST /setenv`. Single source of truth: la nostra UI.
+- **Settings UI**: nuova card "Unit3DWebUp" con stato online/offline, versione, latenza, indicatore WebSocket, pulsanti "Aggiorna" e "Spingi config".
+- **Versione**: la sezione che prima mostrava `unit3dup` (PyPI) ora mostra `Unit3DWebUp` (GitHub). Update flow via `git pull` + `pip install -r requirements.txt` + `systemctl --user restart unit3dwebup.service`.
+
+### Added
+- Nuovi endpoint `/api/webup/health`, `/api/webup/sync`, `/api/webup/setting`, `/api/webup/filter` per integrarsi con il nuovo bot.
+- Unit systemd `deploy/systemd/unit3dwebup.service` + README di installazione.
+- Nuovo log source `webup` (rimpiazza `unit3dup`) nel filtro Logs.
+
+### Removed
+- Subprocess invocation di `unit3dup` CLI (`stream_unit3dup`, `run_unit3dup`).
+- Endpoint stdin del wizard/quickupload e UI per i prompt interattivi (TMDB ID, duplicate C/S/Q): non più necessari, il nuovo bot risolve TMDB/TVDB internamente al `/scan` e accetta override via `/settmdbid`.
+- Endpoint `/api/version/update/unit3dup/stream` (rimpiazzato da `/api/version/update/webup/stream`).
+
+### Fixed
+- **Bridge config: chiavi vuote rompevano webup**. La sync verso `Unit3DWebUp` `.env` pushava valori vuoti per chiavi tipo `TORRENT__SHARED_QBIT_PATH=`, `PREFS__RELEASER_SIGN=`, ecc. Il validator Pydantic di webup (`empty_to_none`) le convertiva in `None`, faceva fallire la validazione `str` e `get_settings()` chiamava `SystemExit(1)` → tutte le richieste successive (incluso `setenv` chiamato dal wizard upload) ritornavano 500. Ora `_to_webup_env_payload` salta valori vuoti, `None`, `no_key`/`no_pass`/`no_path`/`no_comment`: webup mantiene i suoi default.
+- **Wizard upload bloccato sul maketorrent**. L'orchestrator aspettava un `posterLogMessage` testuale "torrent created/exists" che webup non manda mai (manda invece `[New torrent] FILE - 100.0`). Refactor: HTTP 200 di `/maketorrent` = completion; drena log buffered per ~1.5s e prosegue. Stesso pattern per `/upload` con detection di terminal success/failure dai log post-call.
+- **Wizard upload: `no Media for ... (0 items)`**. Per le serie passavamo `SCAN_PATH = <folder serie>` → webup vedeva singoli episodi non il pack. Fix: per `kind=series`, `SCAN_PATH=parent(seeding_path)`, match_path = la folder. Webup riconosce le subfolders come Media-pack.
+- **Config bridge: chiavi mancanti**. Aggiunte al `WEBUP_KEY_MAP`: `MULTI_TRACKER → TRACKER__MULTI_TRACKER`, `IMGFI_KEY → TRACKER__IMGFI_KEY`, `SHARED_TRASM_PATH`, `SHARED_RTORR_PATH`, `TAG_ORDER_MOVIE → PREFS__TAG_POSITION_MOVIE`, `TAG_ORDER_SERIE → PREFS__TAG_POSITION_SERIE`. Liste serializzate come CSV (compatibile con i validator `parse_multi_tracker` e `parse_tag_position` di webup).
+- **Image host order propagation**. La `IMAGE_HOST_ORDER` (lista nostra) ora viene proiettata sulle priorità numeriche di webup (`PREFS__<HOST>_PRIORITY`) — gli host non in lista vanno a priorità 99, evitando che webup tenti host senza chiave.
+
 ---
 
 ## [0.6.4] - 2026-04-25

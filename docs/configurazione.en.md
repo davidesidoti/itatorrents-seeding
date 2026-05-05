@@ -3,7 +3,7 @@
 `unit3dprep` reads configuration from three layers, in order of priority:
 
 1. **Environment variables** — always win.
-2. **`Unit3Dbot.json`** — shared with the `unit3dup` CLI, editable from the Web UI.
+2. **Shared `.env` file** — single file read by both `unit3dprep` and the `Unit3DWebUp` 0.0.20+ bot. Editable from the Web UI.
 3. **Built-in defaults** — used when neither env nor file sets a value.
 
 `U3DP_*` and `W_*` keys are re-read on every access via `config.runtime_setting()`: changing them from the Web UI takes effect immediately, no restart needed. Exceptions are `U3DP_HOST`, `U3DP_PORT`, `U3DP_ROOT_PATH`, and `U3DP_HTTPS_ONLY`, which are read once at server startup.
@@ -46,11 +46,15 @@
 
 | Variable | Default | Description |
 |---|---|---|
-| `UNIT3DUP_CONFIG` | `~/Unit3Dup_config/Unit3Dbot.json` | Override path to `Unit3Dbot.json`. Read only at startup. |
+| `U3DP_ENV_PATH` | — | Full file path of the shared `.env`. Explicit unit3dprep override. |
+| `ENVPATH` | — | Directory containing the `.env` (file = `<dir>/.env`). Same convention used by `Unit3DWebUp`: pass the same value to the bot's `uvicorn`. |
+| `UNIT3DUP_CONFIG` | `~/Unit3Dup_config/Unit3Dbot.json` | Path of the **legacy** `Unit3Dbot.json` to read during the one-shot migration at first startup. Not used afterwards. |
+
+Precedence for the on-disk `.env` file: `U3DP_ENV_PATH` → `ENVPATH/.env` → `~/.config/unit3dprep/.env` (XDG default).
 
 ### Web UI wizard (W_*)
 
-Control the default state of the upload wizard toggles. Stored in `Unit3Dbot.json`, editable from Settings.
+Control the default state of the upload wizard toggles. Stored in the shared `.env`, editable from Settings.
 
 | Key | Default | Description |
 |---|---|---|
@@ -62,13 +66,19 @@ Control the default state of the upload wizard toggles. Stored in `Unit3Dbot.jso
 
 ---
 
-## `Unit3Dbot.json` file
+## Shared `.env` file
 
-`Unit3Dbot.json` is the same file `unit3dup` consumes. Default path: `~/Unit3Dup_config/Unit3Dbot.json`, override via `UNIT3DUP_CONFIG`.
+Settings are stored in a single `.env` file shared with the `Unit3DWebUp` 0.0.20+ bot backend. Default path: `~/.config/unit3dprep/.env` (override via `U3DP_ENV_PATH` or `ENVPATH`).
 
-It contains ~100 keys, grouped by purpose:
+Keys understood by webup are written on disk with the **canonical** naming the bot expects (prefixes `TRACKER__`, `TORRENT__`, `PREFS__`); in memory and in the `/api/settings` API the short historical names (`ITT_APIKEY`, `QBIT_HOST`, …) are kept. Translation is confined to `unit3dprep/web/config.py`. To run the bot alongside, just point it at the same path:
 
-| Group | Key examples |
+```bash
+ENVPATH=~/.config/unit3dprep uvicorn unit3dwup.start:app
+```
+
+Keys are grouped by purpose:
+
+| Group | Short API keys |
 |---|---|
 | Trackers | `ITT_URL`, `ITT_APIKEY`, `ITT_PID`, `PTT_URL`, `PTT_APIKEY`, `PTT_PID`, `SIS_URL`, `SIS_APIKEY`, `SIS_PID`, `MULTI_TRACKER` |
 | Metadata | `TMDB_APIKEY`, `TVDB_APIKEY`, `YOUTUBE_KEY`, `IGDB_*` |
@@ -77,6 +87,10 @@ It contains ~100 keys, grouped by purpose:
 | Behavior | `DUPLICATE_ON`, `SKIP_DUPLICATE`, `ANON`, `PERSONAL_RELEASE`, `NUMBER_OF_SCREENSHOTS`, … |
 | Seeding Flow | all `U3DP_*` (overrides defaults) |
 | Wizard defaults | all `W_*` |
+
+### Automatic migration from legacy `Unit3Dbot.json`
+
+On the first startup of `unit3dprep`, if `~/Unit3Dup_config/Unit3Dbot.json` (or whatever `$UNIT3DUP_CONFIG` points to) exists, it is read, rewritten as `.env` with the canonical naming, and renamed to `Unit3Dbot.json.migrated-bak`. The migration is idempotent and the backup is never deleted by the app — you can remove it manually after confirming everything works.
 
 ### Secret masking
 
@@ -87,7 +101,7 @@ Masked keys are defined in `unit3dprep/web/config.py` (constant `MASKED_KEYS`):
 
 ### Atomic writes
 
-Writes to `Unit3Dbot.json` go through `tempfile.mkstemp` + `os.replace` → the `unit3dup` CLI never sees a half-written file.
+Writes to the `.env` go through `tempfile.mkstemp` + `os.replace` → neither `unit3dprep` nor `Unit3DWebUp` ever see a half-written file.
 
 ---
 

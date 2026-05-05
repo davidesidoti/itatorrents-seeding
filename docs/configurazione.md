@@ -3,7 +3,7 @@
 `unit3dprep` si configura su tre livelli, con precedenza:
 
 1. **Variabili d'ambiente** — hanno sempre la priorità.
-2. **`Unit3Dbot.json`** — file condiviso con la CLI `unit3dup`, editabile anche dalla Web UI.
+2. **File `.env` condiviso** — file unico letto sia da `unit3dprep` che dal bot `Unit3DWebUp` 0.0.20+. Editabile anche dalla Web UI.
 3. **Default interni** — usati quando né env né file specificano un valore.
 
 Le chiavi `U3DP_*` e `W_*` vengono rilette ad ogni accesso tramite `config.runtime_setting()`: modificarle da Web UI ha effetto immediato, senza riavvio. Le eccezioni sono `U3DP_HOST`, `U3DP_PORT`, `U3DP_ROOT_PATH` e `U3DP_HTTPS_ONLY`, lette solo all'avvio del server.
@@ -46,11 +46,15 @@ Le chiavi `U3DP_*` e `W_*` vengono rilette ad ogni accesso tramite `config.runti
 
 | Variabile | Default | Descrizione |
 |---|---|---|
-| `UNIT3DUP_CONFIG` | `~/Unit3Dup_config/Unit3Dbot.json` | Override del path al file `Unit3Dbot.json`. Letto solo all'avvio. |
+| `U3DP_ENV_PATH` | — | Path completo (file) del `.env` condiviso. Override esplicito unit3dprep. |
+| `ENVPATH` | — | Directory contenente il `.env` (file = `<dir>/.env`). Stessa convenzione usata da `Unit3DWebUp`: passa lo stesso valore al `uvicorn` del bot. |
+| `UNIT3DUP_CONFIG` | `~/Unit3Dup_config/Unit3Dbot.json` | Path del **vecchio** `Unit3Dbot.json` da cui leggere durante la migration one-shot al primo avvio. Dopo la migration non viene più usato. |
+
+Precedenza per il file `.env` su disco: `U3DP_ENV_PATH` → `ENVPATH/.env` → `~/.config/unit3dprep/.env` (default XDG).
 
 ### Wizard Web UI (W_*)
 
-Controllano i default degli switch del wizard di upload. Vivono in `Unit3Dbot.json` e si editano da Settings.
+Controllano i default degli switch del wizard di upload. Vivono nel `.env` condiviso e si editano da Settings.
 
 | Chiave | Default | Descrizione |
 |---|---|---|
@@ -62,13 +66,19 @@ Controllano i default degli switch del wizard di upload. Vivono in `Unit3Dbot.js
 
 ---
 
-## File `Unit3Dbot.json`
+## File `.env` condiviso
 
-Il file `Unit3Dbot.json` è lo stesso che usa la CLI `unit3dup`. Path di default: `~/Unit3Dup_config/Unit3Dbot.json`, override via `UNIT3DUP_CONFIG`.
+Lo storage delle impostazioni è un singolo file `.env` condiviso con il backend bot `Unit3DWebUp` 0.0.20+. Path di default: `~/.config/unit3dprep/.env` (override via `U3DP_ENV_PATH` o `ENVPATH`).
 
-Contiene ~100 chiavi, raggruppate per scopo:
+Sul disco le chiavi che esistono in webup vengono salvate con la **nomenclatura canonica** che si aspetta `Unit3DWebUp` (prefissi `TRACKER__`, `TORRENT__`, `PREFS__`); in memoria e nella API `/api/settings` restano i nomi corti storici (`ITT_APIKEY`, `QBIT_HOST`, …). La traduzione è confinata a `unit3dprep/web/config.py`. Per lanciare il bot accanto, basta passargli lo stesso path:
 
-| Gruppo | Chiavi principali |
+```bash
+ENVPATH=~/.config/unit3dprep uvicorn unit3dwup.start:app
+```
+
+Contiene le chiavi raggruppate per scopo:
+
+| Gruppo | Chiavi principali (nomi corti API) |
 |---|---|
 | Tracker | `ITT_URL`, `ITT_APIKEY`, `ITT_PID`, `PTT_URL`, `PTT_APIKEY`, `PTT_PID`, `SIS_URL`, `SIS_APIKEY`, `SIS_PID`, `MULTI_TRACKER` |
 | Metadata | `TMDB_APIKEY`, `TVDB_APIKEY`, `YOUTUBE_KEY`, `IGDB_*` |
@@ -77,6 +87,10 @@ Contiene ~100 chiavi, raggruppate per scopo:
 | Comportamento | `DUPLICATE_ON`, `SKIP_DUPLICATE`, `ANON`, `PERSONAL_RELEASE`, `NUMBER_OF_SCREENSHOTS`, ... |
 | Seeding Flow | tutte le `U3DP_*` (override del default) |
 | Wizard defaults | tutte le `W_*` |
+
+### Migration automatica dal vecchio `Unit3Dbot.json`
+
+Al primo avvio di `unit3dprep`, se esiste `~/Unit3Dup_config/Unit3Dbot.json` (o quanto puntato da `$UNIT3DUP_CONFIG`) viene letto, riscritto come `.env` con la nomenclatura canonica, e rinominato in `Unit3Dbot.json.migrated-bak`. La migration è idempotente e il backup non viene mai cancellato dall'app — l'utente può rimuoverlo manualmente dopo aver verificato il funzionamento.
 
 ### Mascheratura dei secret
 
@@ -87,7 +101,7 @@ Le chiavi mascherate sono definite in `unit3dprep/web/config.py` (costante `MASK
 
 ### Scrittura atomica
 
-Le write su `Unit3Dbot.json` passano per `tempfile.mkstemp` + `os.replace` → la CLI `unit3dup` non vede mai un file a metà.
+Le write sul `.env` passano per `tempfile.mkstemp` + `os.replace` → né `unit3dprep` né `Unit3DWebUp` vedono mai un file a metà.
 
 ---
 
