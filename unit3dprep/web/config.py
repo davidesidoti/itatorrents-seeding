@@ -342,6 +342,18 @@ _IMAGE_HOSTS = (
 )
 _PRIORITY_KEYS = {f"PREFS__{h}_PRIORITY" for h in _IMAGE_HOSTS}
 
+# Webup's get_settings() does Path(settings.prefs.TORRENT_ARCHIVE_PATH) and
+# Path.exists() at startup. If the value is None or empty webup raises
+# SystemExit(1) and lru_caches the failure — meaning every following request
+# returns 500. Our config uses "" as "unset"; on disk we must materialize
+# something webup can call Path() on. "." (the bot's CWD) is the same
+# fallback the upstream .env(example) ships with.
+_WEBUP_REQUIRED_PATH_KEYS = {
+    "TORRENT_ARCHIVE_PATH",
+    "WATCHER_PATH",
+    "WATCHER_DESTINATION_PATH",
+}
+
 
 def _stringify_value(v: Any) -> str | None:
     """Env-string form for a webup-mapped value, or ``None`` to skip pushing.
@@ -581,6 +593,8 @@ def _short_to_canonical(cfg: dict[str, Any]) -> dict[str, str]:
     for short, val in cfg.items():
         if short in WEBUP_KEY_MAP:
             sv = _stringify_value(val)
+            if sv is None and short in _WEBUP_REQUIRED_PATH_KEYS:
+                sv = "."
             if sv is not None:
                 out[WEBUP_KEY_MAP[short]] = sv
         else:
@@ -588,6 +602,9 @@ def _short_to_canonical(cfg: dict[str, Any]) -> dict[str, str]:
     order = cfg.get("IMAGE_HOST_ORDER")
     if isinstance(order, list) and order:
         out.update(_image_host_priorities(order))
+    # Webup needs PREFS__SCAN_PATH at boot; the orchestrator overrides it
+    # per-upload via /setenv but the file must always carry a valid default.
+    out.setdefault("PREFS__SCAN_PATH", ".")
     return out
 
 
