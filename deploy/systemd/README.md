@@ -12,20 +12,24 @@ processes that make the upload pipeline work:
    user mode (compile in `~/.local/redis` or use a reserved port). On WSL
    dev: `sudo apt install -y redis-server && sudo systemctl start redis-server`.
 
-2. **Unit3DWebUp checkout** at `~/dev/Unit3DWebUp` with its own venv at
-   `~/dev/Unit3DWebUp/.venv` and dependencies installed:
+2. **Unit3DWebUp** installed from PyPI inside a venv at `~/dev/Unit3DWebUp/.venv`.
+   Branch `0.0.x` no longer ships `requirements.txt`; install the published
+   package directly:
 
    ```bash
-   git clone https://github.com/31December99/Unit3DWebUp.git ~/dev/Unit3DWebUp
-   cd ~/dev/Unit3DWebUp
+   mkdir -p ~/dev/Unit3DWebUp && cd ~/dev/Unit3DWebUp
    python3 -m venv .venv
-   .venv/bin/pip install -r requirements.txt
-   cp '.env(example)' .env
-   # edit .env — fill TRACKER__ITT_*, TORRENT__QBIT_*, PREFS__SCAN_PATH,
-   # PREFS__TORRENT_ARCHIVE_PATH, etc.
+   .venv/bin/pip install --upgrade pip
+   .venv/bin/pip install Unit3DwebUp
+   .venv/bin/python -c "import unit3dwup.start; print(unit3dwup.start.app)"
    ```
 
-   To customize paths/service unit, set in this app's `Unit3Dbot.json` (or env):
+   The bot reads its config from the `.env` whose directory is given by
+   `ENVPATH=`. The shipped unit points it at `~/.config/unit3dprep/`, which
+   is the same `.env` unit3dprep writes — single source of truth, no need
+   to maintain a second config file.
+
+   To customize paths/service unit, set in this app's `.env` (or env vars):
    - `WEBUP_REPO_PATH` (default `~/dev/Unit3DWebUp`)
    - `WEBUP_SYSTEMD_UNIT` (default `unit3dwebup.service`)
    - `WEBUP_VENV_BIN` (default `<repo>/.venv/bin`)
