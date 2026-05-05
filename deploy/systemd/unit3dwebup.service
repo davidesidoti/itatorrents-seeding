@@ -1,0 +1,20 @@
+[Unit]
+Description=Unit3DWebUp FastAPI bot
+Documentation=https://github.com/31December99/Unit3DWebUp
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/dev/Unit3DWebUp
+Environment=DOCKER=false
+Environment=PYTHONUNBUFFERED=1
+Environment=REDIS_HOST=127.0.0.1
+Environment=REDIS_PORT=6379
+EnvironmentFile=-%h/dev/Unit3DWebUp/.env
+ExecStart=%h/dev/Unit3DWebUp/.venv/bin/uvicorn start:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

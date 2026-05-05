@@ -581,28 +581,98 @@ function HardlinkStep({ token, onNext, onFinishOnly }: {
   );
 }
 
+interface ProgressInfo { phase?: string; label?: string; pct: number; sub_pct?: number; }
+
+const PHASES: { id: string; short: string }[] = [
+  { id: 'setenv',      short: 'Setup' },
+  { id: 'scan',        short: 'Scan' },
+  { id: 'maketorrent', short: 'Torrent' },
+  { id: 'upload',      short: 'Upload' },
+  { id: 'seed',        short: 'Seed' },
+];
+
+function ProgressBar({ progress, done, success }: {
+  progress: ProgressInfo | null; done: boolean; success: boolean;
+}) {
+  const pct = done ? 100 : Math.max(0, Math.min(100, progress?.pct ?? 0));
+  const phaseIdx = progress?.phase ? PHASES.findIndex((p) => p.id === progress.phase) : -1;
+  const barColor = done
+    ? (success ? 'var(--green)' : 'var(--red)')
+    : 'var(--blue-bright)';
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        fontSize: 10, fontFamily: 'var(--font-display)', fontWeight: 600,
+        marginBottom: 6, color: 'var(--fg-3)',
+        letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase',
+      }}>
+        <span>
+          {progress?.label || (done ? (success ? 'Completato' : 'Errore') : 'In avvio…')}
+          {progress?.sub_pct !== undefined && progress.sub_pct > 0 && progress.sub_pct < 100 && !done && (
+            <span style={{
+              marginLeft: 8, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)',
+            }}>{progress.sub_pct.toFixed(0)}%</span>
+          )}
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--fg-2)' }}>
+          {pct.toFixed(0)}%
+        </span>
+      </div>
+      <div style={{
+        height: 6, background: 'var(--bg-base)', borderRadius: 3,
+        overflow: 'hidden', position: 'relative',
+        border: '1px solid var(--border-subtle)',
+      }}>
+        <div style={{
+          height: '100%', width: `${pct}%`,
+          background: barColor,
+          transition: 'width 250ms ease-out',
+          borderRadius: 3,
+        }} />
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', marginTop: 4,
+        fontSize: 9, fontFamily: 'var(--font-display)', color: 'var(--fg-4)',
+        letterSpacing: 'var(--tracking-wide)',
+      }}>
+        {PHASES.map((p, i) => {
+          const reached = phaseIdx >= 0 && i <= phaseIdx;
+          const current = phaseIdx === i && !done;
+          return (
+            <span key={p.id} style={{
+              color: done && success ? 'var(--green)' : current ? 'var(--blue-bright)' : reached ? 'var(--fg-2)' : 'var(--fg-4)',
+              fontWeight: current ? 700 : 500,
+            }}>{p.short}</span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function UploadStep({ token, onClose }: { token: string; onClose: () => void; }) {
   const { t } = useTranslation();
   type Line = { t: string; msg: string };
   const [lines, setLines] = useState<Line[]>([]);
-  const [progress, setProgress] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState<{ kind: string; text: string } | null>(null);
+  const [progress, setProgress] = useState<ProgressInfo | null>(null);
   const [done, setDone] = useState(false);
   const [exitCode, setExitCode] = useState<number | null>(null);
-  const [manual, setManual] = useState('');
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const close = openSSE(`/api/wizard/${token}/upload`, {
       onEvent: (name, data) => {
         if (name === 'log') setLines((l) => [...l, { t: 'info', msg: data }]);
-        else if (name === 'progress') setProgress(data);
+        else if (name === 'progress') {
+          try { setProgress(JSON.parse(data) as ProgressInfo); } catch { /* */ }
+        }
         else if (name === 'error') setLines((l) => [...l, { t: 'error', msg: data }]);
-        else if (name === 'input_needed') {
-          try { setPrompt(JSON.parse(data)); } catch {/* */}
-        } else if (name === 'done') {
+        else if (name === 'done') {
           try { setExitCode(JSON.parse(data).exit_code); } catch {/* */}
-          setDone(true); setProgress(null); close();
+          setDone(true);
+          setProgress((p) => p ? { ...p, pct: 100 } : null);
+          close();
         }
       },
     });
@@ -611,13 +681,7 @@ function UploadStep({ token, onClose }: { token: string; onClose: () => void; })
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [lines, progress]);
-
-  const respond = async (value: string) => {
-    setLines((l) => [...l, { t: 'info', msg: `[User] → ${value}` }]);
-    setPrompt(null);
-    try { await api.post(`/api/wizard/${token}/stdin`, { value }); } catch {/* */}
-  };
+  }, [lines]);
 
   const colors: Record<string, string> = {
     info: 'var(--fg-2)', error: 'var(--red)',
@@ -636,12 +700,16 @@ function UploadStep({ token, onClose }: { token: string; onClose: () => void; })
         }} />
         {t('wizard.uploadStreaming')}
       </div>
+
+      <ProgressBar progress={progress} done={done} success={exitCode === 0} />
+
       <div
         ref={logRef}
         style={{
           background: 'var(--bg-base)', border: '1px solid var(--border-subtle)',
-          borderRadius: 6, padding: 12, height: 340, overflowY: 'auto',
+          borderRadius: 6, padding: 12, height: 300, overflowY: 'auto',
           fontFamily: 'var(--font-mono)', fontSize: 11, lineHeight: 1.7,
+          marginTop: 10,
         }}
       >
         {lines.map((l, i) => (
@@ -652,72 +720,7 @@ function UploadStep({ token, onClose }: { token: string; onClose: () => void; })
             {l.msg}
           </div>
         ))}
-        {progress && (
-          <div style={{ color: 'var(--blue-bright)' }}>
-            <span style={{ color: 'var(--fg-4)', marginRight: 8 }}>
-              {String(lines.length + 1).padStart(3, '0')}
-            </span>
-            {progress}
-          </div>
-        )}
       </div>
-
-      {prompt && (
-        <div style={{
-          marginTop: 12, padding: 12, background: 'rgba(245,166,35,0.08)',
-          border: '1px solid var(--yellow)', borderRadius: 6,
-        }}>
-          <div style={{
-            fontSize: 12, color: 'var(--yellow)',
-            fontFamily: 'var(--font-mono)', marginBottom: 8,
-          }}>⚠ {prompt.text}</div>
-          {prompt.kind === 'duplicate' ? (
-            <div style={{ display: 'flex', gap: 6 }}>
-              {([
-                ['c', t('wizard.uploadContinue'), 'var(--blue)',     '#fff'],
-                ['s', t('wizard.uploadSkip'),     'var(--bg-card)', 'var(--fg-1)'],
-                ['q', t('wizard.uploadQuit'),     'var(--red-dim)', 'var(--red)'],
-              ] as [string, string, string, string][]).map(([v, label, bg, fg]) => (
-                <button
-                  key={v}
-                  onClick={() => respond(v)}
-                  style={{
-                    background: bg, border: '1px solid var(--border)',
-                    color: fg, padding: '6px 14px', borderRadius: 4,
-                    fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                    fontFamily: 'var(--font-display)',
-                  }}
-                >({v.toUpperCase()}) {label}</button>
-              ))}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                autoFocus
-                value={manual}
-                onChange={(e) => setManual(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') respond(manual || '0'); }}
-                placeholder="TMDB ID"
-                style={{
-                  flex: 1, background: 'var(--bg-base)',
-                  border: '1px solid var(--border)', borderRadius: 4,
-                  padding: '6px 10px', fontSize: 11, color: 'var(--fg-1)',
-                  fontFamily: 'var(--font-mono)',
-                }}
-              />
-              <button
-                onClick={() => respond(manual || '0')}
-                style={{
-                  background: 'var(--yellow)', border: 'none',
-                  color: 'var(--bg-base)', padding: '6px 14px', borderRadius: 4,
-                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                  fontFamily: 'var(--font-display)',
-                }}
-              >{t('wizard.uploadSend')}</button>
-            </div>
-          )}
-        </div>
-      )}
 
       {done && (
         <div style={{

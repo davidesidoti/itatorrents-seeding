@@ -29,12 +29,11 @@ from ...upload import (
     build_movie_name_from_file,
     do_hardlink_movie,
     do_hardlink_series,
-    stream_unit3dup,
 )
 from ...i18n import get_request_lang, t as _i18n_t
 from ..db import record_upload, update_exit_code
 from ..logbuf import emit as log_emit
-from ..logclass import classify as classify_unit3dup
+from ..webup_orchestrator import stream_webup
 
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
 
@@ -100,10 +99,6 @@ class TmdbBody(BaseModel):
 class NamesBody(BaseModel):
     final_names: dict[str, str]
     folder_name: str = ""
-
-
-class StdinBody(BaseModel):
-    value: str = "0"
 
 
 # ---------------------------------------------------------------------------
@@ -275,8 +270,15 @@ async def _build_proposed_names(state: dict[str, Any]) -> dict[str, str]:
         specs = extract_specs(first)
         source, src_type = map_source(g)
         tag = g.get("release_group", "") or folder_guess.get("release_group", "") or ""
+        # Season-pack folder name: include "S<NN>" right after the title.
+        # Prefer the season inferred from the first episode's filename;
+        # fall back to the folder's own guessit (`Season 1`, `S01`, etc.).
+        season = g.get("season") if g.get("season") is not None else folder_guess.get("season")
+        if isinstance(season, list):
+            season = season[0] if season else None
+        season_label = f"S{int(season):02d}" if season is not None else ""
         folder_nm = build_name(
-            title=title, year="", se="",
+            title=title, year="", se=season_label,
             specs=specs, source=source, src_type=src_type, tag=tag,
         )
         state["folder_name"] = folder_nm
@@ -346,7 +348,7 @@ async def wizard_hardlink(request: Request, tok: str):
 
 
 @router.get("/wizard/{tok}/upload")
-async def wizard_upload(tok: str):
+async def wizard_upload(tok: str, request: Request):
     state = _get(tok)
     seeding_path = state.get("seeding_path", "")
     if not seeding_path:
@@ -354,51 +356,47 @@ async def wizard_upload(tok: str):
             yield {"event": "error", "data": "No seeding path set"}
         return EventSourceResponse(_err())
     kind = state["kind"]
-    args = ["-b", "-u" if kind in {"movie", "episode"} else "-f", seeding_path]
-    q: asyncio.Queue = asyncio.Queue()
-    state["stdin_queue"] = q
     tmdb_id = state.get("tmdb_id", "")
 
+    app = request.app
+
     async def generate() -> AsyncGenerator[dict, None]:
-        async for ev in stream_unit3dup(args, input_queue=q, tmdb_id=tmdb_id):
+        async for ev in stream_webup(
+            client=app.state.webup,
+            ws=app.state.webup_ws,
+            scan_lock=app.state.webup_scan_lock,
+            seeding_path=seeding_path,
+            kind=kind,
+            tmdb_id=tmdb_id,
+        ):
             et = ev["type"]
             if et == "log":
-                kind, event = classify_unit3dup(ev["data"])
-                log_emit(kind, ev["data"], "unit3dup", source="unit3dup", event=event)
+                ev_kind = ev.get("kind", "info")
+                event_slug = ev.get("event")
+                log_emit(ev_kind, ev["data"], "webup", source="webup", event=event_slug)
                 yield {"event": "log", "data": ev["data"]}
             elif et == "progress":
-                yield {"event": "progress", "data": ev["data"]}
-            elif et == "input_needed":
-                yield {
-                    "event": "input_needed",
-                    "data": json.dumps({"text": ev["data"], "kind": ev.get("kind", "tmdb")}),
-                }
+                yield {"event": "progress", "data": json.dumps({
+                    "phase": ev.get("phase"),
+                    "label": ev.get("label"),
+                    "pct": ev.get("pct", 0),
+                    "sub_pct": ev.get("sub_pct", 0),
+                })}
             elif et == "error":
-                log_emit("error", ev["data"], "unit3dup")
+                log_emit("error", ev["data"], "webup", source="webup")
                 yield {"event": "error", "data": ev["data"]}
             elif et == "done":
                 code = ev.get("exit_code", -1)
                 state["exit_code"] = code
                 state["upload_done"] = True
-                state.pop("stdin_queue", None)
                 await update_exit_code(seeding_path, code)
                 log_emit(
                     "ok" if code == 0 else "error",
-                    f"unit3dup exit {code}", "wizard",
+                    f"webup exit {code}", "wizard",
                 )
                 yield {"event": "done", "data": json.dumps({"exit_code": code})}
 
     return EventSourceResponse(generate())
-
-
-@router.post("/wizard/{tok}/stdin")
-async def wizard_stdin(tok: str, body: StdinBody):
-    state = _get(tok)
-    q: asyncio.Queue | None = state.get("stdin_queue")
-    if q is None:
-        return JSONResponse({"error": "no active process"}, status_code=400)
-    await q.put((body.value or "0").strip() or "0")
-    return JSONResponse({"ok": True})
 
 
 @router.post("/wizard/{tok}/finish-hardlink")

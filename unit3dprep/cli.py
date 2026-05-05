@@ -88,14 +88,50 @@ def resolve_collision(target: Path) -> str:
     return {"o": "overwrite", "s": "skip", "c": "cancel"}.get(choice, "cancel")
 
 
-def run_unit3dup(args: list[str]):
-    import subprocess
+def run_webup_sync(seeding_path: str, kind: str, tmdb_id: str = "") -> int:
+    """Drive Unit3DWebUp pipeline synchronously, printing logs to stdout.
+
+    Returns the upload exit code (0 = success). Used as a sys.exit() value.
+    """
+    import asyncio
+
+    from .web.webup_client import WebupClient
+    from .web.webup_orchestrator import stream_webup
+    from .web.webup_ws import WebupWSManager
+
+    async def _drain() -> int:
+        client = WebupClient()
+        ws = WebupWSManager()
+        ws.start()
+        scan_lock = asyncio.Lock()
+        code = -1
+        try:
+            async for ev in stream_webup(
+                client=client,
+                ws=ws,
+                scan_lock=scan_lock,
+                seeding_path=seeding_path,
+                kind=kind,
+                tmdb_id=tmdb_id,
+            ):
+                et = ev["type"]
+                if et == "log":
+                    print(ev["data"])
+                elif et == "progress":
+                    print(f"[progress] {ev['data']}")
+                elif et == "error":
+                    print(f"[error] {ev['data']}", file=sys.stderr)
+                elif et == "done":
+                    code = ev.get("exit_code", -1)
+        finally:
+            await ws.stop()
+            await client.aclose()
+        return code
+
     try:
-        result = subprocess.run(["unit3dup", *args])
-        sys.exit(result.returncode)
-    except FileNotFoundError:
-        print("Errore: 'unit3dup' non trovato nel PATH.")
-        sys.exit(127)
+        return asyncio.run(_drain())
+    except KeyboardInterrupt:
+        return 130
 
 
 def handle_file(path: Path):
@@ -145,11 +181,11 @@ def handle_file(path: Path):
         hardlink_file(path, target, overwrite=True)
         print(f"Hardlink creato: {target}")
 
-    if not prompt_confirm(f"Uploadare '{target.name}' tramite unit3dup? [y/n]:"):
+    if not prompt_confirm(f"Uploadare '{target.name}' tramite Unit3DWebUp? [y/n]:"):
         print("Annullato (hardlink rimane in ~/seedings).")
         sys.exit(0)
 
-    run_unit3dup(["-b", "-u", str(target.resolve())])
+    sys.exit(run_webup_sync(str(target.resolve()), kind="movie"))
 
 
 def handle_folder(folder: Path):
@@ -234,17 +270,17 @@ def handle_folder(folder: Path):
         for orig, new in episode_rename.items():
             print(f"  {orig.name} -> {new}{orig.suffix.lower()}")
 
-    if not prompt_confirm(f"Uploadare '{target_dir.name}' tramite unit3dup? [y/n]: "):
+    if not prompt_confirm(f"Uploadare '{target_dir.name}' tramite Unit3DWebUp? [y/n]: "):
         print("Annullato (hardlink rimane in ~/seedings).")
         sys.exit(0)
 
-    run_unit3dup(["-b", "-f", str(target_dir.resolve())])
+    sys.exit(run_webup_sync(str(target_dir.resolve()), kind="series"))
 
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description="Verifica lingua italiana, rinomina secondo nomenclatura ItaTorrents e carica tramite unit3dup."
+        description="Verifica lingua italiana, rinomina secondo nomenclatura ItaTorrents e carica tramite Unit3DWebUp."
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-u", "--upload", metavar="FILE", help="Singolo file video (film)")

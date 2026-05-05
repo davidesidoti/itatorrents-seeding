@@ -65,12 +65,26 @@ export interface VersionAppTarget extends VersionTarget {
 
 export interface VersionBotTarget extends VersionTarget {
   installed: boolean;
+  repo_path?: string;
 }
 
 export interface VersionInfo {
   app: VersionAppTarget;
-  unit3dup: VersionBotTarget;
+  webup: VersionBotTarget;
   can_update_app: boolean;
+  can_update_webup?: boolean;
+}
+
+export interface WebupHealth {
+  ok: boolean;
+  base_url?: string;
+  version?: string;
+  scan_path?: string;
+  torrent_archive_path?: string;
+  torrent_client?: string;
+  latency_ms?: number;
+  ws_connected?: boolean;
+  error?: string;
 }
 
 export interface UploadedRecord {
@@ -122,7 +136,7 @@ export type LogSource =
   | 'client'
   | 'tracker'
   | 'wizard'
-  | 'unit3dup'
+  | 'webup'
   | 'system';
 
 export interface LogLine {
