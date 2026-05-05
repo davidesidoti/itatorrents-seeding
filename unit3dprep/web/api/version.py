@@ -122,6 +122,29 @@ def _current_webup_repo_version() -> str | None:
     return None
 
 
+def _current_webup_pip_version() -> str | None:
+    """Read installed Unit3DwebUp version from the webup venv's site-packages.
+
+    Webup 0.0.x is distributed via PyPI and no longer exposes a VERSION key in
+    /setting nor in .env(example), so importlib.metadata against the webup venv
+    is the canonical source.
+    """
+    py = _webup_python()
+    if not Path(py).exists():
+        return None
+    try:
+        r = subprocess.run(
+            [py, "-c", "import importlib.metadata as m; print(m.version('Unit3DwebUp'))"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode != 0:
+            return None
+        v = (r.stdout or "").strip()
+        return v or None
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------- remote --
 
 async def _fetch_github_latest(client: httpx.AsyncClient) -> dict | None:
@@ -196,7 +219,11 @@ async def _compute_info() -> dict:
         )
     app_current = _current_app_version()
     app_latest = release["version"] if release else None
-    webup_current = await _current_webup_version() or _current_webup_repo_version()
+    webup_current = (
+        await _current_webup_version()
+        or _current_webup_pip_version()
+        or _current_webup_repo_version()
+    )
     return {
         "app": {
             "current": app_current,
@@ -358,7 +385,11 @@ async def _stream_subprocess(argv: list[str], cwd: Path | None = None) -> AsyncG
 async def update_webup():
     """Update Unit3DWebUp: git pull → pip install → systemctl restart."""
     async def gen() -> AsyncGenerator[dict, None]:
-        before = await _current_webup_version() or _current_webup_repo_version()
+        before = (
+            await _current_webup_version()
+            or _current_webup_pip_version()
+            or _current_webup_repo_version()
+        )
         yield _sse("start", {"target": "webup", "current": before})
 
         repo = _webup_repo_path()
@@ -430,7 +461,9 @@ async def update_webup():
         # Invalidate cache so the next /version/info reflects the new version.
         _cache["data"] = None
         _cache["at"] = 0.0
-        after = _current_webup_repo_version()  # webup HTTP probably down right now
+        # webup HTTP probably down right now (just restarted) — fall back to
+        # the pip-installed version, which is updated synchronously above.
+        after = _current_webup_pip_version() or _current_webup_repo_version()
         yield _sse("done", {"ok": True, "target": "webup", "from": before, "to": after})
 
     return EventSourceResponse(gen())
